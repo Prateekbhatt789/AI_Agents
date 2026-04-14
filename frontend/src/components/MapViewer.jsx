@@ -1,0 +1,263 @@
+import { useEffect } from 'react'
+import {
+    MapContainer,
+    TileLayer,
+    Marker,
+    Popup,
+    Circle,
+    useMap,
+    useMapEvents
+} from 'react-leaflet'
+import L from 'leaflet'
+import '../utils/fixLeafletIcons'
+
+function FlyToLocation({ lat, lon }) {
+    const map = useMap()
+    useEffect(() => {
+        if (lat && lon) map.flyTo([lat, lon], 14, { duration: 1.5 })
+    }, [lat, lon, map])
+    return null
+}
+
+function FlyToSuggestion({ suggestions }) {
+    const map = useMap()
+    useEffect(() => {
+        const best = suggestions?.[0]
+        if (best?.lat && best?.lon) {
+            map.flyTo([best.lat, best.lon], 15, { duration: 2 })
+        }
+    }, [suggestions, map])
+    return null
+}
+
+function MapClickHandler({ onMapClick, isAnalyzing, isAnalyzed, centerLat, centerLon, radiusKm }) {
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371
+        const dLat = (lat2 - lat1) * Math.PI / 180
+        const dLon = (lon2 - lon1) * Math.PI / 180
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) *
+            Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    }
+
+    const map = useMapEvents({
+        click(e) {
+            const { lat, lng } = e.latlng
+
+            if (isAnalyzing) return
+
+            if (isAnalyzed && centerLat && centerLon && radiusKm) {
+                const dist = getDistance(centerLat, centerLon, lat, lng)
+                if (dist <= radiusKm) {
+                    L.popup()
+                        .setLatLng([lat, lng])
+                        .setContent(`
+                            <div style="padding:6px 8px;text-align:center;font-family:Inter,system-ui,sans-serif;">
+                                <strong>Area already analyzed</strong><br/>
+                                <small>Click outside the blue circle<br/>to select a new location</small>
+                            </div>
+                        `)
+                        .openOn(map)
+                    return
+                }
+            }
+
+            onMapClick(lat, lng)
+        }
+    })
+
+    return null
+}
+
+const CATEGORY_STYLES = {
+    human_hospitals: { color: '#ef4444', symbol: 'H' },
+    vet_hospitals: { color: '#f59e0b', symbol: 'V' },
+    bus_stops: { color: '#22c55e', symbol: 'B' },
+    fuel_stations: { color: '#f97316', symbol: 'F' },
+    schools: { color: '#8b5cf6', symbol: 'S' },
+    restaurants: { color: '#ec4899', symbol: 'R' },
+    pharmacies: { color: '#06b6d4', symbol: 'P' },
+    buildings: { color: '#64748b', symbol: 'BLD' },
+}
+
+function createColoredIcon(category) {
+    const style = CATEGORY_STYLES[category] || { color: '#60a5fa', symbol: 'POI' }
+    return L.divIcon({
+        className: '',
+        html: `
+            <div style="
+                background: radial-gradient(circle at top, rgba(255,255,255,0.55), transparent 40%), ${style.color};
+                width: 34px;
+                height: 34px;
+                border-radius: 999px;
+                border: 2px solid rgba(255,255,255,0.95);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: ${style.symbol.length > 1 ? '9px' : '13px'};
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                box-shadow: 0 10px 22px rgba(15,23,42,0.28);
+                font-family: Inter, system-ui, sans-serif;
+            ">
+                ${style.symbol}
+            </div>
+        `,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+        popupAnchor: [0, -17],
+    })
+}
+
+const RANK_CONFIGS = {
+    1: { bg: '#f59e0b', label: '1', size: 46, glow: 'rgba(245,158,11,0.55)' },
+    2: { bg: '#94a3b8', label: '2', size: 42, glow: 'rgba(148,163,184,0.45)' },
+    3: { bg: '#b45309', label: '3', size: 40, glow: 'rgba(180,83,9,0.45)' },
+}
+
+function createRankedIcon(rank) {
+    const c = RANK_CONFIGS[rank] || RANK_CONFIGS[1]
+    return L.divIcon({
+        className: '',
+        html: `
+            <div style="
+                background: radial-gradient(circle at top, rgba(255,255,255,0.55), transparent 42%), ${c.bg};
+                border: 3px solid white;
+                border-radius: 50%;
+                width: ${c.size}px;
+                height: ${c.size}px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: ${Math.round(c.size * 0.35)}px;
+                font-weight: 800;
+                box-shadow: 0 0 0 6px rgba(255,255,255,0.25), 0 18px 36px ${c.glow};
+                font-family: Inter, system-ui, sans-serif;
+            ">${c.label}</div>
+        `,
+        iconSize: [c.size, c.size],
+        iconAnchor: [c.size / 2, c.size / 2],
+        popupAnchor: [0, -(c.size / 2)],
+    })
+}
+
+const RANK_TITLES = {
+    1: 'Best Location',
+    2: '2nd Best Location',
+    3: '3rd Best Location',
+}
+
+export default function MapViewer({
+    lat, lon, radiusKm, poiData,
+    suggestions,
+    onMapClick,
+    isAnalyzing, isAnalyzed
+}) {
+    return (
+        <MapContainer
+            center={[20.5937, 78.9629]}
+            zoom={5}
+            style={{ width: '100%', height: '100%' }}
+        >
+            <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution="&copy; OpenStreetMap contributors"
+            />
+
+            {onMapClick && (
+                <MapClickHandler
+                    onMapClick={onMapClick}
+                    isAnalyzing={isAnalyzing}
+                    isAnalyzed={isAnalyzed}
+                    centerLat={lat}
+                    centerLon={lon}
+                    radiusKm={radiusKm}
+                />
+            )}
+
+            {lat && lon && <FlyToLocation lat={lat} lon={lon} />}
+
+            {suggestions && suggestions.length > 0 && (
+                <FlyToSuggestion suggestions={suggestions} />
+            )}
+
+            {lat && lon && (
+                <Marker position={[lat, lon]}>
+                    <Popup>
+                        <strong>Selected Location</strong><br />
+                        {lat.toFixed(4)}, {lon.toFixed(4)}
+                    </Popup>
+                </Marker>
+            )}
+
+            {lat && lon && radiusKm && (
+                <Circle
+                    center={[lat, lon]}
+                    radius={radiusKm * 1000}
+                    pathOptions={{
+                        color: '#0891b2',
+                        weight: isAnalyzed ? 2 : 1,
+                        fillColor: '#22d3ee',
+                        fillOpacity: isAnalyzed ? 0.1 : 0.06
+                    }}
+                />
+            )}
+
+            {poiData && Object.entries(poiData).map(([category, items]) => {
+                if (category === 'summary' || !Array.isArray(items)) return null
+
+                const icon = createColoredIcon(category)
+                const style = CATEGORY_STYLES[category] || { symbol: 'POI' }
+
+                return items.slice(0, 50).map((item, i) => (
+                    <Marker
+                        key={`${category}-${i}`}
+                        position={[item.lat, item.lon]}
+                        icon={icon}
+                    >
+                        <Popup>
+                            <strong>{style.symbol} {item.name}</strong><br />
+                            <small style={{ color: '#64748b' }}>
+                                {category.replace(/_/g, ' ').toUpperCase()}
+                            </small>
+                        </Popup>
+                    </Marker>
+                ))
+            })}
+
+            {suggestions && suggestions.map(s => (
+                s?.lat && s?.lon ? (
+                    <Marker
+                        key={`suggestion-${s.rank}`}
+                        position={[s.lat, s.lon]}
+                        icon={createRankedIcon(s.rank)}
+                    >
+                        <Popup>
+                            <strong>
+                                {RANK_TITLES[s.rank] || `Option ${s.rank}`}
+                            </strong><br />
+                            <small style={{ color: '#475569' }}>
+                                {s.label}
+                            </small><br /><br />
+                            {s.notes?.map((note, i) => (
+                                <span key={i} style={{ fontSize: '12px' }}>
+                                    {note}<br />
+                                </span>
+                            ))}
+                            <br />
+                            <small style={{ color: '#94a3b8' }}>
+                                {s.lat?.toFixed(4)}, {s.lon?.toFixed(4)}
+                            </small>
+                        </Popup>
+                    </Marker>
+                ) : null
+            ))}
+
+        </MapContainer>
+    )
+}

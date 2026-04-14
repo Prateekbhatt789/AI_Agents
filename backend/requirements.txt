@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+httpx
+python-dotenv
+overpy
+osmnx
+sentence-transformers
+pinecone
+langchain
+langchain-groq
+fpdf2
+
+
+
