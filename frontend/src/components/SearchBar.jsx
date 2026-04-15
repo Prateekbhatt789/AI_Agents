@@ -128,7 +128,7 @@ export default function SearchBar({
 
                     {/* Tick marks and labels */}
                     <div className="flex justify-between mt-3 px-0.5 text-xs text-slate-400 dark:text-slate-500">
-                        <span>0</span>
+                        <span>1</span>
                         <span>10</span>
                     </div>
                 </div>
