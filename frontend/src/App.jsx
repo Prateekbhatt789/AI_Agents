@@ -96,6 +96,7 @@ export default function App() {
   const [isThinking, setIsThinking] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [sessionId, setSessionId] = useState(null)
+  const [showAdmin, setShowAdmin] = useState(false)
 
   async function handleSearch(query, radius) {
     setStatus('Searching...')
@@ -259,26 +260,30 @@ export default function App() {
 
           <div className="relative">
             <img
-              className="h-12 w-12 rounded-2xl object-contain shadow-md ring-1 ring-white"
-              src="/nav_logo.png"
+              className="h-20 w-20 object-contain "
+              src="/image.png"
               alt="Logo"
             />
-            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-600 text-white">
+            {/* <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-600 text-white">
               <PinIcon className="h-2.5 w-2.5" />
-            </span>
+            </span> */}
           </div>
 
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#44ACFF]">
-              Spatial Intelligence
+            <p
+              className="m-0 mb-[5px] text-[28px] leading-none font-montserrat font-bold uppercase "
+            >
+              <span className="text-[#011649]">Geo-Spatial</span>{" "}
+              <span className="text-[#64ae09]">Intelligence</span>
             </p>
-            <span className="text-xl font-semibold tracking-wide text-slate-800">
-              GIS AI Agent
+            <span className="block text-xl leading-none font-bold tracking-wide text-[#019ee1]">
+              Locate : Analyze : Act
             </span>
           </div>
 
         </div>
 
+      <div className='flex items-center gap-3'>
         {/* Status */}
         <span className={`inline-flex items-center gap-3 rounded-full border border-cyan-300 bg-white px-4 py-2 text-xs font-semibold shadow-sm ${statusTone}`}>
 
@@ -289,6 +294,20 @@ export default function App() {
 
           {status}
         </span>
+        <div className="relative">
+          <img
+            className="h-10 w-10 cursor-pointer rounded-full object-cover"
+            src="/user.png"
+            alt="User"
+            onClick={() => setShowAdmin(prev => !prev)}
+          />
+          {showAdmin && (
+            <div className="absolute z-10 right-0 top-full rounded-md border border-cyan-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-md">
+              admin
+            </div>
+          )}
+        </div>
+        </div>
 
       </nav>
       <div className="flex flex-1 overflow-hidden">
