@@ -147,7 +147,7 @@ export default function SearchBar({
                             Analyzing...
                         </>
                     ) : (
-                        'Analyze this Area'
+                        'Analyze Selected Area'
                     )}
                 </span>
             </button>
