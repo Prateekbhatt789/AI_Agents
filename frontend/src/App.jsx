@@ -161,9 +161,6 @@ export default function App() {
               src="/image.png"
               alt="Logo"
             />
-            {/* <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-600 text-white">
-              <PinIcon className="h-2.5 w-2.5" />
-            </span> */}
           </div>
 
           <div>
@@ -191,7 +188,7 @@ export default function App() {
 
             {status}
           </span>
-          <div className="relative">
+          <div className="relative z-50">
             <img
               className="h-10 w-10 cursor-pointer rounded-full object-cover"
               src="/user.png"
@@ -199,7 +196,7 @@ export default function App() {
               onClick={() => setShowAdmin(prev => !prev)}
             />
             {showAdmin && (
-              <div className="absolute z-10 right-0 top-full rounded-md border border-cyan-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-md">
+              <div className="absolute z-50 mt-1 right-0 top-full rounded-md border border-cyan-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-lg">
                 admin
               </div>
             )}
@@ -220,7 +217,7 @@ export default function App() {
         </div>
         
         {/* map */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 z-0">
           {!lat && !isAnalyzing && (
             <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-slate-500">
               <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-[2rem] border border-white/70 bg-white/75 text-cyan-700 shadow-2xl shadow-slate-900/10 backdrop-blur-xl">

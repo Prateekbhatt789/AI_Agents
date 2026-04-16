@@ -1,6 +1,7 @@
 import { useState } from "react";
 import SearchBar from './SearchBar'
 import Dashboard from "./Dashboard";
+import { DownloadIcon } from './Icons'
 
 export default function SidePanel() {
     const [lat, setLat] = useState(null)
@@ -81,8 +82,8 @@ export default function SidePanel() {
 
 
     return (
-        <div 
-        className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-white/40 bg-[#0f766e] p-2 backdrop-blur-md"
+        <div
+            className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-r border-white/40 bg-[#0f766e] p-2 backdrop-blur-md"
         >
             <SearchBar
                 onSearch={handleSearch}
@@ -96,6 +97,19 @@ export default function SidePanel() {
                 summary={summary}
                 onDownload={handleDownload}
             />
+            <div className="flex w-full items-center justify-center gap-1 rounded-2xl  bg-white/72  py-2 text-sm font-semibold text-slate-900 transition hover:bg-[#14b8a6] hover:text-white hover:border hover:border-white">
+                <button
+                    onClick={handleDownload}
+                    className="flex gap-2 items-center justify-center ">
+                    {/* Icon with black background */}
+                    <span className="flex items-center justify-center h-5 w-5 rounded-full bg-black text-white">
+                        <DownloadIcon className="h-4 w-4" />
+                    </span>
+                    <div className="text-xl">
+                        Download Report
+                    </div>
+                </button>
+            </div>
         </div>
     )
 }
