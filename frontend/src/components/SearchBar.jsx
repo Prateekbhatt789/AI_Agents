@@ -28,7 +28,7 @@ export default function SearchBar({
         if (!query.trim()) return
         onSearch(query.trim(), radius)
     }
-
+    const percentage = (radiusIndex / (radiusOptions.length - 1)) * 100;
     return (
         <div className="group rounded-xl  bg-white/72 p-2 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl">
             <div className='ml-3 mb-2'>
@@ -94,10 +94,13 @@ export default function SearchBar({
                         step={1}
                         value={radiusIndex}
                         onChange={(e) => setRadiusIndex(Number(e.target.value))}
+                        style={{
+                            background: `linear-gradient(to right, #57b6f2 ${percentage}%, #e2e8f0 ${percentage}%)`
+                        }}
                         className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full outline-none appearance-none cursor-pointer
         [&::-webkit-slider-thumb]:appearance-none
-        [&::-webkit-slider-thumb]:w-5
-        [&::-webkit-slider-thumb]:h-5
+        [&::-webkit-slider-thumb]:w-4
+        [&::-webkit-slider-thumb]:h-4
         [&::-webkit-slider-thumb]:rounded-full
         [&::-webkit-slider-thumb]:bg-gradient-to-br
         [&::-webkit-slider-thumb]:from-blue-500
