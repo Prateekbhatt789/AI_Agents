@@ -11,7 +11,7 @@ export default function SearchBar({
 
     const [query, setQuery] = useState('')
     const [radius, setRadius] = useState(5)
-    const radiusOptions = [1, 3, 5, 10]
+    const radiusOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     const [radiusIndex, setRadiusIndex] = useState(2) // default = 5 km
 
     useEffect(() => {
@@ -85,7 +85,7 @@ export default function SearchBar({
                     </div>
                 </div>
 
-                {/* Slider Container */}
+                
                 <div className="relative">
                     <input
                         type="range"
@@ -129,12 +129,13 @@ export default function SearchBar({
       "
                     />
 
-                    {/* Tick marks and labels */}
+                
                     <div className="flex justify-between mt-3 px-0.5 text-xs text-slate-400 dark:text-slate-500">
                         <span>1</span>
                         <span>10</span>
                     </div>
                 </div>
+               
 
             </div>
             <button
