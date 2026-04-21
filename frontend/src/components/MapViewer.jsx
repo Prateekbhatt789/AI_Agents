@@ -53,7 +53,7 @@ function ConstrainToDelhiExtent() {
         if (!delhiBoundaryBounds) return
 
         map.setMaxBounds(delhiBoundaryBounds.pad(0.35))
-        map.setMinZoom(9)
+        map.setMinZoom(10)
     }, [map])
 
     return null
@@ -232,7 +232,7 @@ export default function MapViewer({
     return (
         <MapContainer
             center={DEFAULT_CENTER}
-            zoom={10}
+            zoom={16}
             style={{ width: '100%', height: '100%' }}
         >
             <TileLayer
