@@ -2,32 +2,78 @@ import { useState } from "react";
 import SearchBar from './SearchBar'
 import Dashboard from "./Dashboard";
 import { DownloadIcon } from './Icons'
+import './sidePanel.css'
+import {
+    searchLocation,
+    fetchPOIs,
+    analyzeLocation,
+    exportPDF
+} from '../services/api'
 
-export default function SidePanel() {
-    const [lat, setLat] = useState(null)
-    const [lon, setLon] = useState(null)
-    const [locationName, setLocationName] = useState('')
-    const [summary, setSummary] = useState({})
-    const [isAnalyzing, setIsAnalyzing] = useState(false)
-    const [isAnalyzed, setIsAnalyzed] = useState(false)
+export default function SidePanel({ lat,
+    lon,
+    radiusKm,
+    locationName,
+    summary,
+    isAnalyzing,
+    isAnalyzed,
+    onSearch,
+    onAnalyze,
+    onDownload,
+    setIsAnalyzing,
+    setIsAnalyzed,
+    setSummary,
+    setLat,
+    setLon,
+    setLocationName,
+    setPoiData,
+    setStatus,
+    setSuggestions,
+    setSessionId, setRadiusKm,
+    addMessage,
+    openContextualPanel }
+) {
+    // const [lat, setLat] = useState(null)
+    // const [lon, setLon] = useState(null)
+    // const [locationName, setLocationName] = useState('')
+    // const [summary, setSummary] = useState({})
+    // const [isAnalyzing, setIsAnalyzing] = useState(false)
+    // const [isAnalyzed, setIsAnalyzed] = useState(false)
 
     async function handleSearch(query, radius) {
         setStatus('Searching...')
         setRadiusKm(radius)
+        debugger;
         try {
             const data = await searchLocation(query)
-            setLat(data.lat)
-            setLon(data.lon)
+
+            const lat = data.lat
+            const lon = data.lon
+
+            // Create GeoJSON point
+            const userPoint = point([lon, lat]) // NOTE: [lng, lat]
+
+            // Check inside boundary
+            const isInside = booleanPointInPolygon(userPoint, boundary['features']['properties'])
+
+            if (!isInside) {
+                setStatus('Location is outside allowed boundary ')
+                return
+            }
+
+            // If inside → proceed normally
+            setLat(lat)
+            setLon(lon)
             setLocationName(data.place_name)
             setPoiData(null)
             setSummary({})
             setIsAnalyzed(false)
             setSuggestions([])
             setSessionId(null)
-            setStatus(`Found: ${data.place_name}`)
+
+            setStatus(`Found: ${data.place_name} Inside boundary`)
         } catch (err) {
-            setStatus('Not found')
-            alert(err.message)
+            setStatus('Location not found')
         }
     }
 
@@ -36,7 +82,7 @@ export default function SidePanel() {
         setIsAnalyzing(true)
 
         try {
-            setStatus('Fetching data from OpenStreetMap...')
+            setStatus('Fetching data ...')
             const pois = await fetchPOIs(lat, lon, radiusKm)
             setPoiData(pois)
             setSummary(pois.summary)
@@ -53,7 +99,7 @@ export default function SidePanel() {
 
             setIsAnalyzed(true)
             setSuggestions([])
-            setStatus(`Done - ${locationName}`)
+            setStatus(`Done`)
             addMessage('ai', `Analysis complete for ${locationName}. Spatial grid ready. Ask me anything.`)
 
         } catch (err) {
@@ -83,19 +129,22 @@ export default function SidePanel() {
 
     return (
         <div
-            className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-r border-white/40 bg-[#0f766e] p-2 backdrop-blur-md"
+            className="side-panel-scrollbar flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-r border-white/40 bg-[#0f766e] p-2 backdrop-blur-md"
         >
             <SearchBar
                 onSearch={handleSearch}
                 onAnalyze={handleAnalyze}
+                onOpenContextualPanel={openContextualPanel}
                 locationFound={!!lat}
                 isAnalyzing={isAnalyzing}
                 locationName={locationName}
+                setRadiusKm={setRadiusKm}
             />
             <Dashboard
                 locationName={locationName}
                 summary={summary}
                 onDownload={handleDownload}
+                onItemClick={openContextualPanel}
             />
             <div className="flex w-full items-center justify-center gap-1 rounded-2xl  bg-white/72  py-2 text-sm font-semibold text-slate-900 transition hover:bg-[#14b8a6] hover:text-white hover:border hover:border-white">
                 <button

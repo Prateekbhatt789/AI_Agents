@@ -1,0 +1,33 @@
+/* Custom scrollbar for side panel */
+
+.side-panel-scrollbar {
+    /* Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: #0f736b transparent;
+}
+
+/* WebKit browsers (Chrome, Safari, Edge) */
+.side-panel-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.side-panel-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.side-panel-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #197e70;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.side-panel-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #14b8a6;
+    background-clip: padding-box;
+}
+
+.side-panel-scrollbar::-webkit-scrollbar-thumb:active {
+    background-color: #0a615a;
+    background-clip: padding-box;
+}

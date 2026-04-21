@@ -13,7 +13,7 @@ import {
 } from './Icons'
 import { useState } from 'react';
 
-export default function Dashboard({ locationName, summary, onDownload }) {
+export default function Dashboard({ locationName, summary, onDownload, onItemClick }) {
     const [selectedCategories, setSelectedCategories] = useState([]);
     const categories = [
         { key: 'human_hospitals', icon: HospitalIcon, label: 'Human Hospitals' },
@@ -31,6 +31,8 @@ export default function Dashboard({ locationName, summary, onDownload }) {
                 ? prev.filter((k) => k !== key)
                 : [...prev, key]
         );
+
+        onItemClick?.(key)
     };
     return (
         <>
@@ -47,12 +49,12 @@ export default function Dashboard({ locationName, summary, onDownload }) {
                     </div>
                 </div>
 
-                {locationName && (
+                {/* {locationName && (
                     <div className="mb-4 flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/85 px-3 py-2 text-xs text-slate-600">
                         <PinIcon className="h-4 w-4 text-cyan-600" />
                         <p className="truncate">{locationName}</p>
                     </div>
-                )}
+                )} */}
 
                 <div className="mb-2 grid grid-cols-1 gap-2">
                     {categories.map(({ key, icon: Icon, label }) => {

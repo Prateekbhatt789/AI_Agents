@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react'
 import { SearchIcon, SparklesIcon, TargetIcon } from './Icons'
+import boundary from '../assets/Delhi_bnd.geojson?raw'
 
 export default function SearchBar({
     onSearch,
     onAnalyze,
+    onOpenContextualPanel,
     locationFound,
     isAnalyzing,
-    locationName
+    locationName,
+    setRadiusKm
 }) {
 
     const [query, setQuery] = useState('')
-    const [radius, setRadius] = useState(5)
+    const [radius, setRadius] = useState(1)
     const radiusOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    const [radiusIndex, setRadiusIndex] = useState(2) // default = 5 km
-
+    const [radiusIndex, setRadiusIndex] = useState(0) // default = 5 km
+    const geojson = JSON.parse(boundary)
     useEffect(() => {
         if (locationName) {
             setQuery(locationName)
@@ -21,7 +24,9 @@ export default function SearchBar({
     }, [locationName])
 
     useEffect(() => {
-        setRadius(radiusOptions[radiusIndex])
+        const newRadius = radiusOptions[radiusIndex]
+        setRadius(newRadius)
+        setRadiusKm(newRadius)
     }, [radiusIndex])
 
     function handleSearch() {
@@ -139,15 +144,17 @@ export default function SearchBar({
 
             </div>
             <button
-                onClick={onAnalyze}
+                onClick={() => {
+                    onOpenContextualPanel?.()
+                    onAnalyze()
+                }}
                 disabled={!locationFound || isAnalyzing}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/40 transition-all duration-200 hover:shadow-xl hover:shadow-blue-600/50 hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:from-[#87aacf] disabled:to-[#3d88d8] disabled:shadow-none disabled:hover:scale-100 disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/40 transition-all duration-200 hover:shadow-xl hover:shadow-blue-600/50  disabled:cursor-not-allowed disabled:from-[#87aacf] disabled:to-[#3d88d8] disabled:shadow-none disabled:opacity-60"
             >
                 <SparklesIcon className="h-5 w-5" />
                 <span>
                     {isAnalyzing ? (
                         <>
-                            <span className="inline-block animate-spin mr-1">⚡</span>
                             Analyzing...
                         </>
                     ) : (

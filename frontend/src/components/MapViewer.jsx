@@ -5,11 +5,59 @@ import {
     Marker,
     Popup,
     Circle,
+    Polygon,
+    Polyline,
     useMap,
     useMapEvents
 } from 'react-leaflet'
 import L from 'leaflet'
 import '../utils/fixLeafletIcons'
+import { delhiBoundaryRing, isWithinDelhiBoundary } from '../utils/delhiBoundary'
+
+const DEFAULT_CENTER = [28.6139, 77.209]
+const WORLD_MASK_RING = [
+    [90, -180],
+    [90, 180],
+    [-90, 180],
+    [-90, -180],
+]
+const delhiBoundaryLatLngs = delhiBoundaryRing.map(([lng, lat]) => [lat, lng])
+
+function getBoundaryBounds(latLngs) {
+    return latLngs.reduce(
+        (bounds, point) => bounds.extend(point),
+        L.latLngBounds(latLngs[0], latLngs[0])
+    )
+}
+
+const delhiBoundaryBounds = delhiBoundaryLatLngs.length
+    ? getBoundaryBounds(delhiBoundaryLatLngs)
+    : null
+
+function FitToDelhiBoundary({ hasSelectedLocation }) {
+    const map = useMap()
+
+    useEffect(() => {
+        if (!hasSelectedLocation && delhiBoundaryBounds) {
+            map.fitBounds(delhiBoundaryBounds, { padding: [24, 24] })
+        }
+    }, [hasSelectedLocation, map])
+
+    return null
+}
+
+function ConstrainToDelhiExtent() {
+    const map = useMap()
+
+    useEffect(() => {
+        if (!delhiBoundaryBounds) return
+
+        map.setMaxBounds(delhiBoundaryBounds.pad(0.35))
+        map.setMinZoom(9)
+    }, [map])
+
+    return null
+}
 
 function FlyToLocation({ lat, lon }) {
     const map = useMap()
@@ -48,6 +96,19 @@ function MapClickHandler({ onMapClick, isAnalyzing, isAnalyzed, centerLat, cente
             const { lat, lng } = e.latlng
 
             if (isAnalyzing) return
+
+            if (!isWithinDelhiBoundary(lat, lng)) {
+                L.popup()
+                    .setLatLng([lat, lng])
+                    .setContent(`
+                            <div style="padding:6px 8px;text-align:center;font-family:Inter,system-ui,sans-serif;">
+                                <strong>Outside Delhi boundary</strong><br/>
+                                <small>Please select a point inside the highlighted region</small>
+                            </div>
+                        `)
+                    .openOn(map)
+                return
+            }
 
             if (isAnalyzed && centerLat && centerLon && radiusKm) {
                 const dist = getDistance(centerLat, centerLon, lat, lng)
@@ -151,23 +212,73 @@ const RANK_TITLES = {
     2: '2nd Best Location',
     3: '3rd Best Location',
 }
+function ResizeMap({ trigger }) {
+  const map = useMap();
 
+  useEffect(() => {
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 300);
+  }, [trigger]);
+
+  return null;
+}
 export default function MapViewer({
     lat, lon, radiusKm, poiData,
     suggestions,
     onMapClick,
-    isAnalyzing, isAnalyzed
+    isAnalyzing, isAnalyzed, trigger
 }) {
     return (
         <MapContainer
-            center={[20.5937, 78.9629]}
-            zoom={5}
+            center={DEFAULT_CENTER}
+            zoom={10}
             style={{ width: '100%', height: '100%' }}
         >
             <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution="&copy; OpenStreetMap contributors"
             />
+
+            <FitToDelhiBoundary hasSelectedLocation={Boolean(lat && lon)} />
+            <ConstrainToDelhiExtent />
+
+            {delhiBoundaryLatLngs.length > 0 && (
+                <>
+                    <Polygon
+                        positions={[WORLD_MASK_RING, delhiBoundaryLatLngs]}
+                        pathOptions={{
+                            stroke: false,
+                            fillColor: '#0f172a',
+                            fillOpacity: 0.28,
+                            interactive: false,
+                        }}
+                    />
+                    <Polygon
+                        positions={delhiBoundaryLatLngs}
+                        pathOptions={{
+                            color: '#fff7ed',
+                            weight: 1.5,
+                            opacity: 0.95,
+                            fillColor: '#22c55e',
+                            fillOpacity: 0.06,
+                            interactive: false,
+                        }}
+                    />
+                    <Polyline
+                        positions={delhiBoundaryLatLngs}
+                        pathOptions={{
+                            color: '#f97316',
+                            weight: 4,
+                            opacity: 0.95,
+                            lineCap: 'round',
+                            lineJoin: 'round',
+                            dashArray: '10 8',
+                        }}
+                        interactive={false}
+                    />
+                </>
+            )}
 
             {onMapClick && (
                 <MapClickHandler
@@ -181,7 +292,7 @@ export default function MapViewer({
             )}
 
             {lat && lon && <FlyToLocation lat={lat} lon={lon} />}
-
+            <ResizeMap trigger={trigger} />
             {suggestions && suggestions.length > 0 && (
                 <FlyToSuggestion suggestions={suggestions} />
             )}

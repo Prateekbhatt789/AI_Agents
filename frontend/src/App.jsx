@@ -13,6 +13,8 @@ import {
   exportPDF,
   reverseGeocode
 } from './services/api'
+import ContextualPanel from './components/ContextualPanel'
+import { isWithinDelhiBoundary } from './utils/delhiBoundary'
 
 function AnalyzeLoader({ status }) {
   return (
@@ -83,18 +85,101 @@ function AnalyzeLoader({ status }) {
 export default function App() {
   const [lat, setLat] = useState(null)
   const [lon, setLon] = useState(null)
-  const [radiusKm, setRadiusKm] = useState(5)
+  const [radiusKm, setRadiusKm] = useState(1)
   const [poiData, setPoiData] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isAnalyzed, setIsAnalyzed] = useState(false)
   const [status, setStatus] = useState('Ready')
-  const [messages, setMessages] = useState([
-    { role: 'ai', text: 'Search a location or click on the map, then run an analysis.' }
-  ])
-  const [isThinking, setIsThinking] = useState(false)
+  const [locationName, setLocationName] = useState('')
+  const [summary, setSummary] = useState({})
+  const [messages, setMessages] = useState([])
   const [suggestions, setSuggestions] = useState([])
   const [sessionId, setSessionId] = useState(null)
   const [showAdmin, setShowAdmin] = useState(false)
+  const [showChat, setShowChat] = useState(false)
+  
+  async function handleSearch(query, radius) {
+    setStatus('Searching...')
+    setRadiusKm(radius)
+    
+    try {
+      const data = await searchLocation(query)
+
+      const lat = data.lat
+      const lon = data.lon
+
+      const isInside = isWithinDelhiBoundary(lat, lon)
+
+      if (!isInside) {
+        setStatus('Location is outside allowed boundary ')
+        return
+      }
+
+      // If inside → proceed normally
+      setLat(lat)
+      setLon(lon)
+      setLocationName(data.place_name)
+      setPoiData(null)
+      setSummary({})
+      setIsAnalyzed(false)
+      setSuggestions([])
+      setSessionId(null)
+      setShowChat(false)
+
+      setStatus(`Found: ${data.place_name} Inside boundary`)
+    } catch (err) {
+      setStatus('Location not found')
+    }
+  }
+
+  async function handleAnalyze() {
+    if (!lat || !lon) return
+    setIsAnalyzing(true)
+
+    try {
+      setStatus('Fetching data ...')
+      const pois = await fetchPOIs(lat, lon, radiusKm)
+      setPoiData(pois)
+      setSummary(pois.summary)
+
+      setStatus('Storing data and building spatial grid...')
+      const analyzeResult = await analyzeLocation(
+        locationName, lat, lon, radiusKm, pois
+      )
+
+      if (analyzeResult?.session_id) {
+        setSessionId(analyzeResult.session_id)
+        console.log('Session ID:', analyzeResult.session_id)
+      }
+
+      setIsAnalyzed(true)
+      setSuggestions([])
+      setStatus(`Done`)
+      addMessage('ai', `Analysis complete for ${locationName}. Spatial grid ready. Ask me anything.`)
+
+    } catch (err) {
+      setStatus('Failed')
+      console.error(err)
+      alert(err.message || 'Failed. Try a smaller radius.')
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  async function handleDownload() {
+    if (!isAnalyzed) return
+    try {
+      const blob = await exportPDF(locationName, lat, lon, radiusKm, summary)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'site_report.pdf'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('PDF failed.')
+    }
+  }
 
 
   function addMessage(role, text) {
@@ -102,6 +187,11 @@ export default function App() {
   }
 
   async function handleMapClick(clickLat, clickLon) {
+    if (!isWithinDelhiBoundary(clickLat, clickLon)) {
+      setStatus('Selected location is outside allowed boundary')
+      return
+    }
+
     setStatus('Getting location name...')
     try {
       const data = await reverseGeocode(clickLat, clickLon)
@@ -113,37 +203,14 @@ export default function App() {
       setIsAnalyzed(false)
       setSuggestions([])
       setSessionId(null)
+      setShowChat(false)
       setStatus(`Found: ${data.place_name}`)
     } catch (err) {
       setStatus('Could not get location name')
     }
   }
 
-  async function handleChat(message) {
-    addMessage('user', message)
-    setIsThinking(true)
-    setSuggestions([])
 
-    try {
-      const data = await chatWithAgent(message, sessionId)
-
-      console.log('DEBUG chat response:', data)
-      console.log('DEBUG suggestions:', data.suggestions)
-
-      addMessage('ai', data.response)
-
-      if (data.suggestions && data.suggestions.length > 0) {
-        setSuggestions(data.suggestions)
-        console.log(`DEBUG ${data.suggestions.length} pins set`)
-      }
-
-    } catch (err) {
-      console.error(err)
-      addMessage('ai', 'Error. Please try again.')
-    } finally {
-      setIsThinking(false)
-    }
-  }
   const statusTone = status === 'Ready'
     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
     : status.startsWith('Failed')
@@ -152,7 +219,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(20,184,166,0.18),_transparent_24%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] text-slate-900">
-      <nav className="flex h-20 items-center justify-between bg-[#F9F8F6] border-b border-cyan-200 px-6 shadow-sm">
+      <nav className="flex h-20 items-center justify-between bg-[#F9F8F6] border-b border-cyan-200 px-6 shadow-sm flex-shrink-0">
         {/* Left Section */}
         <div className="flex items-center gap-4">
           <div className="relative">
@@ -202,21 +269,46 @@ export default function App() {
             )}
           </div>
         </div>
-
       </nav>
+
+      {/* Main content area - properly constrained */}
       <div className="flex flex-1 overflow-hidden">
 
-        <SidePanel />
-         <div className="w-80 shrink-0 border-l border-white/40 bg-white/25 p-4 backdrop-blur-md">
-          <ChatPanel
-            messages={messages}
-            onSend={handleChat}
-            isThinking={isThinking}
-            isReady={isAnalyzed}
-          />
-        </div>
-        
-        {/* map */}
+        <SidePanel
+          lat={lat}
+          lon={lon}
+          radiusKm={radiusKm}
+          locationName={locationName}
+          summary={summary}
+          isAnalyzing={isAnalyzing}
+          isAnalyzed={isAnalyzed}
+          onSearch={handleSearch}
+          onAnalyze={handleAnalyze}
+          onDownload={handleDownload}
+          setIsAnalyzing={setIsAnalyzing}
+          setIsAnalyzed={setIsAnalyzed}
+          setSummary={setSummary}
+          setLat={setLat}
+          setLon={setLon}
+          setLocationName={setLocationName}
+          setPoiData={setPoiData}
+          setStatus={setStatus}
+          setRadiusKm={setRadiusKm}
+          setSuggestions={setSuggestions}
+          setSessionId={setSessionId}
+          addMessage={addMessage}
+          openContextualPanel={() => setShowChat(true)}
+        />
+        {/* Contextual Panel - positioned absolutely over map */}
+        {showChat && (
+          <div className="relative top-0 bottom-0 z-40 h-full">
+            <ContextualPanel
+              setShowChat={setShowChat}
+              showChat={showChat}
+            />
+          </div>
+        )}
+        {/* Map container */}
         <div className="relative flex-1 z-0">
           {!lat && !isAnalyzing && (
             <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-slate-500">
@@ -240,10 +332,11 @@ export default function App() {
             onMapClick={handleMapClick}
             isAnalyzing={isAnalyzing}
             isAnalyzed={isAnalyzed}
+            trigger={showChat}
           />
         </div>
 
-       
+
 
       </div>
     </div>
