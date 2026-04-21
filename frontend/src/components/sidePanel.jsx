@@ -9,6 +9,7 @@ import {
     analyzeLocation,
     exportPDF
 } from '../services/api'
+import { isWithinDelhiBoundary } from '../utils/delhiBoundary'
 
 export default function SidePanel({ lat,
     lon,
@@ -43,18 +44,14 @@ export default function SidePanel({ lat,
     async function handleSearch(query, radius) {
         setStatus('Searching...')
         setRadiusKm(radius)
-        debugger;
+
         try {
             const data = await searchLocation(query)
 
-            const lat = data.lat
-            const lon = data.lon
+            const latitude = data?.lat
+            const longitude = data?.lon
 
-            // Create GeoJSON point
-            const userPoint = point([lon, lat]) // NOTE: [lng, lat]
-
-            // Check inside boundary
-            const isInside = booleanPointInPolygon(userPoint, boundary['features']['properties'])
+            const isInside = isWithinDelhiBoundary(latitude, longitude)
 
             if (!isInside) {
                 setStatus('Location is outside allowed boundary ')
@@ -62,14 +59,15 @@ export default function SidePanel({ lat,
             }
 
             // If inside → proceed normally
-            setLat(lat)
-            setLon(lon)
+            setLat(latitude)
+            setLon(longitude)
             setLocationName(data.place_name)
             setPoiData(null)
             setSummary({})
             setIsAnalyzed(false)
             setSuggestions([])
             setSessionId(null)
+            // setShowChat(false)
 
             setStatus(`Found: ${data.place_name} Inside boundary`)
         } catch (err) {

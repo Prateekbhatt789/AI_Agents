@@ -213,15 +213,15 @@ const RANK_TITLES = {
     3: '3rd Best Location',
 }
 function ResizeMap({ trigger }) {
-  const map = useMap();
+    const map = useMap();
 
-  useEffect(() => {
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 300);
-  }, [trigger]);
+    useEffect(() => {
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 300);
+    }, [trigger]);
 
-  return null;
+    return null;
 }
 export default function MapViewer({
     lat, lon, radiusKm, poiData,
@@ -234,6 +234,7 @@ export default function MapViewer({
             center={DEFAULT_CENTER}
             zoom={16}
             style={{ width: '100%', height: '100%' }}
+            attributionControl={false}
         >
             <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -368,7 +369,11 @@ export default function MapViewer({
                     </Marker>
                 ) : null
             ))}
-
+            {/* Your Custom Attribution */}
+            <div className='absolute bottom-2 right-2 z-[1000] flex items-center gap-1 bg-black/80 backdrop-blur-sm rounded-full text-white px-4 py-1.5 text-xs shadow-lg border border-white/10'>
+                <span className="opacity-80">Powered By</span>
+                <span className="font-bold tracking-wide">ML Infomap</span>
+            </div>
         </MapContainer>
     )
 }

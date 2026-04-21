@@ -105,8 +105,8 @@ export default function App() {
     try {
       const data = await searchLocation(query)
 
-      const lat = data.lat
-      const lon = data.lon
+      let lat = data?.lat
+      let lon = data?.lon
 
       const isInside = isWithinDelhiBoundary(lat, lon)
 
@@ -322,7 +322,7 @@ export default function App() {
           {isAnalyzing && (
             <AnalyzeLoader status={status} />
           )}
-
+        
           <MapViewer
             lat={lat}
             lon={lon}
