@@ -311,18 +311,17 @@ export default function App() {
           setSelectedCategories={setSelectedCategories}
           openContextualPanel={() => setShowChat(true)}
         />
+        {showChat && (
+          <div className="relative z-30 h-full w-80 shrink-0">
+            <ContextualPanel
+              setShowChat={setShowChat}
+              showChat={showChat}
+              selectedCategories={selectedCategories}
+            />
+          </div>
+        )}
         {/* Map container */}
         <div className="relative flex-1 z-0 overflow-hidden">
-          {showChat && (
-            <div className="absolute inset-y-0 left-0 z-[1200] flex w-80">
-              <ContextualPanel
-                setShowChat={setShowChat}
-                showChat={showChat}
-                selectedCategories={selectedCategories}
-              />
-            </div>
-          )}
-
           {!lat && !isAnalyzing && (
             <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-slate-500">
               <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-[2rem] border border-white/70 bg-white/75 text-cyan-700 shadow-2xl shadow-slate-900/10 backdrop-blur-xl">
