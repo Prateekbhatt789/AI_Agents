@@ -141,7 +141,6 @@ export default function App() {
 
   async function handleAnalyze() {
     if (!lat || !lon) return
-    openContextualPanel('chat')
     setIsAnalyzing(true)
 
     try {
@@ -162,6 +161,7 @@ export default function App() {
 
       setIsAnalyzed(true)
       setSuggestions([])
+      openContextualPanel('chat')
       setStatus(`Done`)
       addMessage('ai', `Analysis complete for ${locationName}. Spatial grid ready. Ask me anything.`)
 

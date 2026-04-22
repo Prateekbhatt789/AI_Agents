@@ -98,6 +98,7 @@ export default function SidePanel({ lat,
 
             setIsAnalyzed(true)
             setSuggestions([])
+            openContextualPanel?.('chat')
             setStatus(`Done`)
             addMessage('ai', `Analysis complete for ${locationName}. Spatial grid ready. Ask me anything.`)
 
