@@ -11,28 +11,26 @@ import {
     SchoolIcon,
     UtensilsIcon
 } from './Icons'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchDashboardCategories } from '../services/api';
 
-export default function Dashboard({ locationName, summary, onDownload, onItemClick }) {
+export default function Dashboard({ locationName, summary, onDownload, onItemClick, onSelectionChange }) {
     const [selectedCategories, setSelectedCategories] = useState([]);
-    const categories = [
-        { key: 'human_hospitals', icon: HospitalIcon, label: 'Human Hospitals' },
-        { key: 'vet_hospitals', icon: PawIcon, label: 'Veterinary Hospitals' },
-        { key: 'bus_stops', icon: BusIcon, label: 'Bus Stops' },
-        { key: 'fuel_stations', icon: FuelIcon, label: 'Fuel Stations' },
-        { key: 'schools', icon: SchoolIcon, label: 'Schools' },
-        { key: 'restaurants', icon: UtensilsIcon, label: 'Restaurants' },
-        { key: 'pharmacies', icon: PillIcon, label: 'Pharmacies' },
-        { key: 'buildings', icon: BuildingIcon, label: 'Buildings' },
-    ]
-    const toggleCategory = (key) => {
-        setSelectedCategories((prev) =>
-            prev.includes(key)
-                ? prev.filter((k) => k !== key)
-                : [...prev, key]
-        );
+    const [categories, setCategories] = useState([]);
 
-        onItemClick?.(key)
+    useEffect(() => {
+        fetchDashboardCategories()
+            .then(data => setCategories(data))
+            .catch(err => setStatus('Error loading categories'));
+    }, []);
+    const toggleCategory = (key) => {
+        const nextSelectedCategories = selectedCategories.includes(key)
+            ? selectedCategories.filter((k) => k !== key)
+            : [...selectedCategories, key];
+
+        setSelectedCategories(nextSelectedCategories);
+        onSelectionChange?.(nextSelectedCategories);
+        onItemClick?.(nextSelectedCategories);
     };
     return (
         <>
@@ -57,37 +55,35 @@ export default function Dashboard({ locationName, summary, onDownload, onItemCli
                 )} */}
 
                 <div className="mb-2 grid grid-cols-1 gap-2">
-                    {categories.map(({ key, icon: Icon, label }) => {
+                    {categories.map(({ key, icon, label }) => { // 1. Removed 'icon: Icon' alias
                         const isSelected = selectedCategories.includes(key);
 
                         return (
                             <div
                                 key={key}
                                 onClick={() => toggleCategory(key)}
-                                className={`group flex items-center gap-1 rounded-full border px-2 py-2 shadow-sm transition-all duration-200 cursor-pointer
-                ${isSelected
+                                className={`group flex items-center gap-1 rounded-full border px-1 py-1 shadow-sm transition-all duration-200 cursor-pointer
+                                ${isSelected
                                         ? "bg-[#14b8a6] text-white border-[#ffffff]"
-                                        : "bg-[#f9f8f6] text-slate-700 border-slate-200 hover:bg-blue-50/50"
-                                    }
-                `}
+                                        : "bg-[#f9f8f6] text-slate-700 border-slate-200 hover:bg-blue-50/100"
+                                    }`}
                             >
-                                {/* Icon + Label */}
-                                <div className="flex items-center gap-2 flex-shrink-0">
+                                <div className="flex items-center gap-4 flex-shrink-0">
+
                                     <span
-                                        className={`flex h-6 w-6 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110
-                        ${isSelected
-                                                ? "bg-white/20 text-white"
-                                                : "bg-gradient-to-br from-blue-100 to-cyan-100 text-[#64ae09]]"
-                                            }
-                        `}
+                                        className={`flex h-8 w-8 items-center justify-center rounded-full overflow-hidden transition-transform duration-200 group-hover:scale-110 flex-shrink-0
+                                                ${isSelected ? "bg-white/20" : "bg-blue-50"}
+                                        `}
                                     >
-                                        <Icon className="h-5 w-5" />
+                                        <div
+                                            className="h-full w-full flex items-center justify-center"
+                                            dangerouslySetInnerHTML={{ __html: icon }}
+                                        />
                                     </span>
 
                                     <span
-                                        className={`text-sm font-medium uppercase tracking-wide
-                        ${isSelected ? "text-white" : "text-slate-500"}
-                        `}
+                                        className={`text-sm font-lg uppercase tracking-wide
+              ${isSelected ? "text-white" : "text-slate-500"}`}
                                     >
                                         {label}
                                     </span>

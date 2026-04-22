@@ -232,7 +232,7 @@ export default function MapViewer({
     return (
         <MapContainer
             center={DEFAULT_CENTER}
-            zoom={16}
+            zoom={18}
             style={{ width: '100%', height: '100%' }}
             attributionControl={false}
         >

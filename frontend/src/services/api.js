@@ -1,4 +1,4 @@
-const BASE = 'http://127.0.0.1:8000/api'
+const BASE = 'http://192.168.1.13:8000/api'
 
 // ── Session ID — stored after /analyze, sent on every /chat ──
 // Also accepts sessionId passed explicitly from App.jsx
@@ -115,5 +115,45 @@ export async function reverseGeocode(lat, lon) {
         lat,
         lon,
         place_name: data.features[0].place_name
+    }
+}
+
+
+export async function fetchDashboardCategories() {
+    try {
+        const response = await fetch(`${BASE}/dashboard`);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        // This returns the list of objects: [{key, label, icon}, ...]
+        return data.data; 
+    } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+        throw error;
+    }
+}
+
+export async function fetchContextualSubCategories(tableNames) {
+    try {
+        const query = tableNames
+            .map(t => `table_names=${encodeURIComponent(t)}`)
+            .join("&");
+
+        const response = await fetch(`${BASE}/subcategory?${query}`);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        return data; // your API already returns structured object
+    } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+        throw error;
     }
 }

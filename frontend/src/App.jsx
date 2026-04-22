@@ -97,6 +97,7 @@ export default function App() {
   const [sessionId, setSessionId] = useState(null)
   const [showAdmin, setShowAdmin] = useState(false)
   const [showChat, setShowChat] = useState(false)
+  const [selectedCategories, setSelectedCategories] = useState([])
   
   async function handleSearch(query, radius) {
     setStatus('Searching...')
@@ -125,6 +126,7 @@ export default function App() {
       setSuggestions([])
       setSessionId(null)
       setShowChat(false)
+      setSelectedCategories([])
 
       setStatus(`Found: ${data.place_name} Inside boundary`)
     } catch (err) {
@@ -204,6 +206,7 @@ export default function App() {
       setSuggestions([])
       setSessionId(null)
       setShowChat(false)
+      setSelectedCategories([])
       setStatus(`Found: ${data.place_name}`)
     } catch (err) {
       setStatus('Could not get location name')
@@ -272,7 +275,15 @@ export default function App() {
       </nav>
 
       {/* Main content area - properly constrained */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden">
+
+        <button
+          onClick={() => setShowChat((prev) => !prev)}
+          className="absolute left-80 top-1/2 z-[1300] flex h-12 w-7 -translate-y-1/2 items-center justify-center rounded-r-xl border border-white/50 bg-white/80 text-lg font-bold text-slate-700 shadow-lg backdrop-blur-md transition-all hover:bg-white"
+          aria-label={showChat ? 'Close contextual panel' : 'Open contextual panel'}
+        >
+          {showChat ? '<' : '>'}
+        </button>
 
         <SidePanel
           lat={lat}
@@ -297,19 +308,21 @@ export default function App() {
           setSuggestions={setSuggestions}
           setSessionId={setSessionId}
           addMessage={addMessage}
+          setSelectedCategories={setSelectedCategories}
           openContextualPanel={() => setShowChat(true)}
         />
-        {/* Contextual Panel - positioned absolutely over map */}
-        {showChat && (
-          <div className="relative top-0 bottom-0 z-40 h-full">
-            <ContextualPanel
-              setShowChat={setShowChat}
-              showChat={showChat}
-            />
-          </div>
-        )}
         {/* Map container */}
-        <div className="relative flex-1 z-0">
+        <div className="relative flex-1 z-0 overflow-hidden">
+          {showChat && (
+            <div className="absolute inset-y-0 left-0 z-[1200] flex w-80">
+              <ContextualPanel
+                setShowChat={setShowChat}
+                showChat={showChat}
+                selectedCategories={selectedCategories}
+              />
+            </div>
+          )}
+
           {!lat && !isAnalyzing && (
             <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-slate-500">
               <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-[2rem] border border-white/70 bg-white/75 text-cyan-700 shadow-2xl shadow-slate-900/10 backdrop-blur-xl">
