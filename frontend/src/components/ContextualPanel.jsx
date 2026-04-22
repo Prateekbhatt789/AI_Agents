@@ -3,11 +3,16 @@ import ChatPanel from './ChatPanel'
 import { fetchContextualSubCategories } from '../services/api'
 import './ContextualPanel.css'
 
-const ContextualPanel = ({ showChat, setShowChat, selectedCategories = [] }) => {
-  const [mode, setMode] = useState('panel')
-  const [messages, setMessages] = useState([])
-  const [isThinking, setIsThinking] = useState(false)
-  const [isAnalyzed, setIsAnalyzed] = useState(false)
+const ContextualPanel = ({
+  showChat,
+  setShowChat,
+  mode = 'panel',
+  onModeChange,
+  selectedCategories = [],
+  messages = [],
+  onSend,
+  isReady = false,
+}) => {
   const [subcategoryData, setSubcategoryData] = useState({})
   const [isLoadingSubcategories, setIsLoadingSubcategories] = useState(false)
   const [subcategoryError, setSubcategoryError] = useState('')
@@ -52,28 +57,6 @@ const ContextualPanel = ({ showChat, setShowChat, selectedCategories = [] }) => 
       isCancelled = true
     }
   }, [mode, selectedCategories])
-
-  async function handleChat(message) {
-    setMessages((prev) => [...prev, { role: 'user', text: message }])
-    setIsThinking(true)
-
-    try {
-      const response = 'Demo response from AI'
-
-      setMessages((prev) => [
-        ...prev,
-        { role: 'ai', text: response }
-      ])
-    } catch (err) {
-      console.error(err)
-      setMessages((prev) => [
-        ...prev,
-        { role: 'ai', text: 'Error. Please try again.' }
-      ])
-    } finally {
-      setIsThinking(false)
-    }
-  }
 
   if (!showChat) return null
 
@@ -184,7 +167,7 @@ const ContextualPanel = ({ showChat, setShowChat, selectedCategories = [] }) => 
 
         {/* Toggle Mode Button */}
         <button
-          onClick={() => setMode(mode === 'chat' ? 'panel' : 'chat')}
+          onClick={() => onModeChange?.(mode === 'chat' ? 'panel' : 'chat')}
           className="absolute top-3 right-3 z-50 
       bg-white/60 backdrop-blur-md 
       border border-white/40 
@@ -204,9 +187,9 @@ const ContextualPanel = ({ showChat, setShowChat, selectedCategories = [] }) => 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1 custom-scroll">
             <ChatPanel
               messages={messages}
-              onSend={handleChat}
-              isThinking={isThinking}
-              isReady={isAnalyzed}
+              onSend={onSend}
+              isThinking={false}
+              isReady={isReady}
             />
           </div>
         )}

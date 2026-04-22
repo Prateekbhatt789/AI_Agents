@@ -1,10 +1,7 @@
 import { useState } from 'react'
-import SearchBar from './components/SearchBar'
-import Dashboard from './components/Dashboard'
 import MapViewer from './components/MapViewer'
-import ChatPanel from './components/ChatPanel'
 import SidePanel from './components/sidePanel'
-import { GlobeIcon, LoaderIcon, PinIcon } from './components/Icons'
+import { GlobeIcon, LoaderIcon } from './components/Icons'
 import {
   searchLocation,
   fetchPOIs,
@@ -97,7 +94,13 @@ export default function App() {
   const [sessionId, setSessionId] = useState(null)
   const [showAdmin, setShowAdmin] = useState(false)
   const [showChat, setShowChat] = useState(false)
+  const [contextualMode, setContextualMode] = useState('panel')
   const [selectedCategories, setSelectedCategories] = useState([])
+
+  function openContextualPanel(mode = 'panel') {
+    setContextualMode(mode)
+    setShowChat(true)
+  }
   
   async function handleSearch(query, radius) {
     setStatus('Searching...')
@@ -125,7 +128,9 @@ export default function App() {
       setIsAnalyzed(false)
       setSuggestions([])
       setSessionId(null)
+      setMessages([])
       setShowChat(false)
+      setContextualMode('panel')
       setSelectedCategories([])
 
       setStatus(`Found: ${data.place_name} Inside boundary`)
@@ -136,6 +141,7 @@ export default function App() {
 
   async function handleAnalyze() {
     if (!lat || !lon) return
+    openContextualPanel('chat')
     setIsAnalyzing(true)
 
     try {
@@ -188,6 +194,19 @@ export default function App() {
     setMessages(prev => [...prev, { role, text }])
   }
 
+  async function handleContextualChat(message) {
+    addMessage('user', message)
+
+    try {
+      const response = await chatWithAgent(message, sessionId)
+      addMessage('ai', response?.response || 'No response received.')
+      setSuggestions(Array.isArray(response?.suggestions) ? response.suggestions : [])
+    } catch (error) {
+      console.error(error)
+      addMessage('ai', error.message || 'Error. Please try again.')
+    }
+  }
+
   async function handleMapClick(clickLat, clickLon) {
     if (!isWithinDelhiBoundary(clickLat, clickLon)) {
       setStatus('Selected location is outside allowed boundary')
@@ -205,7 +224,9 @@ export default function App() {
       setIsAnalyzed(false)
       setSuggestions([])
       setSessionId(null)
+      setMessages([])
       setShowChat(false)
+      setContextualMode('panel')
       setSelectedCategories([])
       setStatus(`Found: ${data.place_name}`)
     } catch (err) {
@@ -309,14 +330,19 @@ export default function App() {
           setSessionId={setSessionId}
           addMessage={addMessage}
           setSelectedCategories={setSelectedCategories}
-          openContextualPanel={() => setShowChat(true)}
+          openContextualPanel={openContextualPanel}
         />
         {showChat && (
           <div className="relative z-30 h-full w-80 shrink-0">
             <ContextualPanel
               setShowChat={setShowChat}
               showChat={showChat}
+              mode={contextualMode}
+              onModeChange={setContextualMode}
               selectedCategories={selectedCategories}
+              messages={messages}
+              onSend={handleContextualChat}
+              isReady={isAnalyzed}
             />
           </div>
         )}

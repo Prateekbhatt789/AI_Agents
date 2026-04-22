@@ -143,7 +143,7 @@ export default function SidePanel({ lat,
                 locationName={locationName}
                 summary={summary}
                 onDownload={handleDownload}
-                onItemClick={openContextualPanel}
+                onItemClick={() => openContextualPanel?.('panel')}
                 onSelectionChange={setSelectedCategories}
             />
             <div className="flex w-full items-center justify-center gap-1 rounded-2xl  bg-white/72  py-2 text-sm font-semibold text-slate-900 transition hover:bg-[#14b8a6] hover:text-white hover:border hover:border-white">

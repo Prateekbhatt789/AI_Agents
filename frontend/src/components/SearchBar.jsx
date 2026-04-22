@@ -145,7 +145,7 @@ export default function SearchBar({
             </div>
             <button
                 onClick={() => {
-                    onOpenContextualPanel?.()
+                    onOpenContextualPanel?.('chat')
                     onAnalyze()
                 }}
                 disabled={!locationFound || isAnalyzing}
