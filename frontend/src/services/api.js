@@ -1,4 +1,4 @@
-const BASE = 'http://192.168.1.16:8000/api'
+const BASE = 'http://192.168.1.13:8000/api'
 
 // ── Session ID — stored after /analyze, sent on every /chat ──
 // Also accepts sessionId passed explicitly from App.jsx
@@ -22,7 +22,7 @@ async function post(endpoint, body) {
 
 // ── Helper: POST with session header (for /chat) ─────────────
 async function postWithSession(endpoint, body, sessionId = null) {
-    // ✅ Use passed sessionId first, fall back to internal _sessionId
+    //  Use passed sessionId first, fall back to internal _sessionId
     const sid = sessionId || _sessionId
 
     if (!sid) {
@@ -136,7 +136,33 @@ export async function fetchDashboardCategories() {
         throw error;
     }
 }
+export async function fetchCategoriesCount(latitude,longitude,radius) {
+    try {
+        const response = await fetch(`${BASE}/fetch-pois`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                lat: latitude,
+                lon: longitude,
+                radius_km: radius
+            })
+        });
 
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Returns a summary object keyed by category name, e.g. { Building: 10, Health Care: 2 }
+        return data.summary || {};
+    } catch (error) {
+        console.error("Failed to fetch category counts:", error);
+        throw error;
+    }
+}
 export async function fetchContextualSubCategories(tableNames) {
     try {
         const query = tableNames

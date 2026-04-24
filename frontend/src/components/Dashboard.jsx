@@ -12,17 +12,58 @@ import {
     UtensilsIcon
 } from './Icons'
 import { useState, useEffect } from 'react';
-import { fetchDashboardCategories } from '../services/api';
+import { fetchDashboardCategories,fetchCategoriesCount } from '../services/api';
 
-export default function Dashboard({ locationName, summary, onDownload, onItemClick, onSelectionChange }) {
+export default function Dashboard({ locationName, summary, lat, lon, radiusKm, onDownload, onItemClick, onSelectionChange }) {
     const [selectedCategories, setSelectedCategories] = useState([]);
     const [categories, setCategories] = useState([]);
 
     useEffect(() => {
-        fetchDashboardCategories()
-            .then(data => setCategories(data))
-            .catch(err => setStatus('Error loading categories'));
-    }, []);
+        let mounted = true;
+
+        function normalizeKey(value) {
+            return String(value || '').toLowerCase().replace(/[_\s-]+/g, '');
+        }
+
+        async function loadCategories() {
+            try {
+                const [categoryList, counts] = await Promise.all([
+                    fetchDashboardCategories(),
+                    lat != null && lon != null && radiusKm != null
+                        ? fetchCategoriesCount(lat, lon, radiusKm)
+                        : Promise.resolve({})
+                ]);
+
+                if (!mounted) return;
+
+                const normalizedCounts = Object.fromEntries(
+                    Object.entries(counts).map(([key, value]) => [normalizeKey(key), value])
+                );
+
+                const enriched = categoryList
+                    .map((item) => {
+                        const keyMatch = normalizedCounts[normalizeKey(item.key)];
+                        const labelMatch = normalizedCounts[normalizeKey(item.label)];
+                        return {
+                            ...item,
+                            count: keyMatch ?? labelMatch ?? 0
+                        };
+                    })
+                    .filter((item) => item.count > 0);
+
+                setCategories(enriched);
+            } catch (err) {
+                console.error('Error loading dashboard categories:', err);
+            }
+        }
+
+        loadCategories();
+
+        return () => {
+            mounted = false;
+        };
+    }, [lat, lon, radiusKm]);
+
     const toggleCategory = (key) => {
         const nextSelectedCategories = selectedCategories.includes(key)
             ? selectedCategories.filter((k) => k !== key)
@@ -55,7 +96,7 @@ export default function Dashboard({ locationName, summary, onDownload, onItemCli
                 )} */}
 
                 <div className="mb-2 grid grid-cols-1 gap-2">
-                    {categories.map(({ key, icon, label }) => { // 1. Removed 'icon: Icon' alias
+                    {categories.map(({ key, icon, label, count }) => { // 1. Removed 'icon: Icon' alias
                         const isSelected = selectedCategories.includes(key);
 
                         return (
@@ -68,24 +109,30 @@ export default function Dashboard({ locationName, summary, onDownload, onItemCli
                                         : "bg-[#f9f8f6] text-slate-700 border-slate-200 hover:bg-blue-50/100"
                                     }`}
                             >
-                                <div className="flex items-center gap-4 flex-shrink-0">
+                                    <div className="flex w-full items-center justify-between gap-3 mr-3">
 
-                                    <span
-                                        className={`flex h-8 w-8 items-center justify-center rounded-full overflow-hidden transition-transform duration-200 group-hover:scale-110 flex-shrink-0
-                                                ${isSelected ? "bg-white/20" : "bg-blue-50"}
-                                        `}
-                                    >
-                                        <div
-                                            className="h-full w-full flex items-center justify-center"
-                                            dangerouslySetInnerHTML={{ __html: icon }}
-                                        />
-                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <span
+                                            className={`flex h-8 w-8 items-center justify-center rounded-full overflow-hidden transition-transform duration-200 group-hover:scale-110 flex-shrink-0
+                                                    ${isSelected ? "bg-white/20" : "bg-blue-50"}
+                                            `}
+                                        >
+                                            <div
+                                                className="h-full w-full flex items-center justify-center"
+                                                dangerouslySetInnerHTML={{ __html: icon }}
+                                            />
+                                        </span>
 
-                                    <span
-                                        className={`text-sm font-lg uppercase tracking-wide
-              ${isSelected ? "text-white" : "text-slate-500"}`}
-                                    >
-                                        {label}
+                                        <span
+                                            className={`text-sm font-lg uppercase tracking-wide
+                      ${isSelected ? "text-white" : "text-slate-500"}`}
+                                        >
+                                            {label}
+                                        </span>
+                                    </div>
+
+                                    <span className={`text-sm font-semibold ${isSelected ? "text-white/90" : "text-slate-500"}`}>
+                                        {count}
                                     </span>
                                 </div>
                             </div>
