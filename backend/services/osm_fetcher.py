@@ -15,7 +15,6 @@ def fetch_pois(lat: float, lon: float, radius_km: float):
                 id,
                 ST_Y(centroid) AS centroid_lat,
                 ST_X(centroid) AS centroid_lon,
-                normalized_score,
                 population_per_grid,
                 ST_AsGeoJSON(geom) AS geom
             FROM data.grids
@@ -40,16 +39,15 @@ def fetch_pois(lat: float, lon: float, radius_km: float):
                 "grid_id": row[0],
                 "lat": row[1],
                 "lon": row[2],
-                "score": row[3],
-                "population": row[4],
-                "geom":row[5]
+                "population": row[3],
+                "geom":row[4]
             }
             for row in grid_rows
         ]
 
         grid_ids = [row[0] for row in grid_rows]
 
-        print("grid ids:", grid_ids)
+        # print("grid ids:", grid_ids)
 
         if not grid_ids:
             return {
@@ -146,3 +144,11 @@ def fetch_pois(lat: float, lon: float, radius_km: float):
 
     finally:
         db.close()
+
+
+
+
+
+
+
+
