@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
     MapContainer,
     TileLayer,
@@ -14,6 +14,7 @@ import {
 import L from 'leaflet'
 import '../utils/fixLeafletIcons'
 import { delhiBoundaryRing, isWithinDelhiBoundary } from '../utils/delhiBoundary'
+import { fetchDashboardCategories } from '../services/api'
 
 
 
@@ -187,6 +188,46 @@ function createColoredIcon(category) {
     })
 }
 
+function normalizeKey(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[_\s-]+/g, '_')
+}
+
+function createCategoryIcon(category, iconHtml) {
+    if (!iconHtml) {
+        return createColoredIcon(category)
+    }
+
+    const normalized = normalizeKey(category)
+    const style = CATEGORY_STYLES[normalized] || { color: '#60a5fa' }
+
+    return L.divIcon({
+        className: '',
+        html: `
+            <div style="
+                background: radial-gradient(circle at top, rgba(255,255,255,0.55), transparent 40%), ${style.color};
+                width: 36px;
+                height: 36px;
+                border-radius: 999px;
+                border: 2px solid rgba(255,255,255,0.95);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 10px 22px rgba(15,23,42,0.22);
+            ">
+                <div style="width: 20px; height: 20px; min-width: 20px; min-height: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    ${iconHtml}
+                </div>
+            </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -18],
+    })
+}
+
 const RANK_CONFIGS = {
     1: { bg: '#f59e0b', label: '1', size: 46, glow: 'rgba(245,158,11,0.55)' },
     2: { bg: '#94a3b8', label: '2', size: 42, glow: 'rgba(148,163,184,0.45)' },
@@ -244,6 +285,38 @@ export default function MapViewer({
     gridData = [],
     showGrid = false
 }) {
+    const [categoryIcons, setCategoryIcons] = useState({})
+
+    useEffect(() => {
+        let mounted = true
+
+        async function loadCategoryIcons() {
+            try {
+                const categories = await fetchDashboardCategories()
+                if (!mounted) return
+
+                const map = {}
+                categories.forEach((item) => {
+                    const key = normalizeKey(item.key || item.label)
+                    const labelKey = normalizeKey(item.label)
+                    if (item.icon) {
+                        map[key] = item.icon
+                        map[labelKey] = item.icon
+                    }
+                })
+                setCategoryIcons(map)
+            } catch (error) {
+                console.error('Failed to load category icons for map markers:', error)
+            }
+        }
+
+        loadCategoryIcons()
+
+        return () => {
+            mounted = false
+        }
+    }, [])
+
     return (
         <MapContainer
             center={DEFAULT_CENTER}
@@ -368,8 +441,10 @@ export default function MapViewer({
             {poiData?.pois && Object.entries(poiData.pois).map(([category, items]) => {
                 if (!Array.isArray(items)) return null
 
-                const icon = createColoredIcon(category)
-                const style = CATEGORY_STYLES[category] || { symbol: 'POI' }
+                const normalizedCategory = normalizeKey(category)
+                const iconHtml = categoryIcons[normalizedCategory]
+                const icon = createCategoryIcon(category, iconHtml)
+                const style = CATEGORY_STYLES[normalizedCategory] || CATEGORY_STYLES[category] || { symbol: 'POI' }
 
                 return items.slice(0, 100).map((item, i) => {
                     if (!item.lat || !item.lon) return null
@@ -383,7 +458,7 @@ export default function MapViewer({
                             <Popup>
                                 <strong>{style.symbol} {item.name || "Unknown"}</strong><br />
                                 <small style={{ color: '#64748b' }}>
-                                    {category.toUpperCase()}
+                                    {normalizedCategory.replace(/_/g, ' ').toUpperCase()}
                                 </small>
                             </Popup>
                         </Marker>
