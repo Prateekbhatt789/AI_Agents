@@ -270,7 +270,7 @@ export default function App() {
               <span className="text-[#64ae09]">Intelligence</span>
             </p>
             <span className="block text-xl leading-none font-bold tracking-wide text-[#019ee1]">
-              Locate : Analyze : Act
+              Locate > Analyze > Act
             </span>
           </div>
 
@@ -355,6 +355,7 @@ export default function App() {
               messages={messages}
               onSend={handleContextualChat}
               isReady={isAnalyzed}
+              poiData={poiData}
             />
           </div>
         )}

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import ChatPanel from './ChatPanel'
-import { fetchContextualSubCategories } from '../services/api'
 import './ContextualPanel.css'
 
 const ContextualPanel = ({
@@ -12,6 +11,7 @@ const ContextualPanel = ({
   messages = [],
   onSend,
   isReady = false,
+  poiData = null,
 }) => {
   const [subcategoryData, setSubcategoryData] = useState({})
   const [isLoadingSubcategories, setIsLoadingSubcategories] = useState(false)
@@ -29,12 +29,41 @@ const ContextualPanel = ({
 
     let isCancelled = false
 
+    function normalizeKey(value) {
+      return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[_\s-]+/g, '')
+    }
+
     async function loadSubcategories() {
       setIsLoadingSubcategories(true)
       setSubcategoryError('')
 
       try {
-        const data = await fetchContextualSubCategories(selectedCategories)
+        const pois = poiData?.pois || {}
+        const poiKeys = Object.keys(pois)
+        const normalizedPoiMap = Object.fromEntries(
+          poiKeys.map((key) => [normalizeKey(key), key])
+        )
+        const data = {}
+
+        selectedCategories.forEach((categoryKey) => {
+          const normalizedCategory = normalizeKey(categoryKey)
+          const matchedPoiKey = normalizedPoiMap[normalizedCategory]
+          const items = matchedPoiKey && Array.isArray(pois[matchedPoiKey])
+            ? pois[matchedPoiKey]
+            : []
+          const counts = items.reduce((acc, poi) => {
+            const subCategory = poi.sub_category || 'Unknown'
+            acc[subCategory] = (acc[subCategory] || 0) + 1
+            return acc
+          }, {})
+
+          data[categoryKey] = Object.entries(counts)
+            .map(([key, value]) => ({ key, value }))
+            .sort((a, b) => b.value - a.value)
+        })
 
         if (!isCancelled) {
           setSubcategoryData(data)
@@ -56,7 +85,7 @@ const ContextualPanel = ({
     return () => {
       isCancelled = true
     }
-  }, [mode, selectedCategories])
+  }, [mode, selectedCategories, poiData])
 
   if (!showChat) return null
 
