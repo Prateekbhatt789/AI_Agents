@@ -1,214 +1,148 @@
-import requests
-import time
-import random
-
-OVERPASS_URLS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://lz4.overpass-api.de/api/interpreter",
-    "https://z.overpass-api.de/api/interpreter"
-]
-
-HEADERS = {
-    "User-Agent": "GIS-Analyzer/1.0 (your_email@example.com)"
-}
+from sqlalchemy import text
+from db.database import SessionLocal
 
 
-def safe_overpass_request(query: str, max_retries: int = 4) -> dict:
-    for attempt in range(max_retries):
-        url = random.choice(OVERPASS_URLS)
+def fetch_pois(lat: float, lon: float, radius_km: float):
 
-        try:
-            response = requests.post(
-                url,
-                data    = {"data": query},
-                headers = HEADERS,
-                timeout = 180
+    db = SessionLocal()
+
+    try:
+        radius_m = radius_km * 1000
+
+        #  Step 1: Fetch full grid data (NOT just id)
+        grid_query = text("""
+            SELECT 
+                id,
+                ST_Y(centroid) AS centroid_lat,
+                ST_X(centroid) AS centroid_lon,
+                normalized_score,
+                population_per_grid,
+                ST_AsGeoJSON(geom) AS geom
+            FROM data.grids
+            WHERE ST_DWithin(
+                geography(centroid),
+                geography(ST_MakePoint(:lon, :lat)),
+                :radius
             )
+        """)
 
-            if response.status_code == 200:
-# JSON (string from API) → Python Dictionary (usable object)
-                data = response.json()
+        grid_result = db.execute(grid_query, {
+            "lat": lat,
+            "lon": lon,
+            "radius": radius_m
+        })
 
-                if "error" in data:
-                    raise Exception(data["error"])
+        grid_rows = grid_result.fetchall()
 
-                return data
+        #  Build grid response
+        grids = [
+            {
+                "grid_id": row[0],
+                "lat": row[1],
+                "lon": row[2],
+                "score": row[3],
+                "population": row[4],
+                "geom":row[5]
+            }
+            for row in grid_rows
+        ]
 
-            else:
-                print(f"🔴 Overpass HTTP {response.status_code} "
-                      f"(attempt {attempt+1}/{max_retries})")
+        grid_ids = [row[0] for row in grid_rows]
 
-        except requests.exceptions.Timeout:
-            print(f"⏱ Overpass timeout (attempt {attempt+1}/{max_retries})")
+        print("grid ids:", grid_ids)
 
-        except requests.exceptions.ConnectionError:
-            print(f"🌐 Overpass connection error (attempt {attempt+1}/{max_retries})")
+        if not grid_ids:
+            return {
+                "grids": [],
+                "pois": {},
+                "summary": {}
+            }
 
-        except Exception as e:
-            print(f"🔴 Overpass error: {e}")
+        params = {"grid_ids": grid_ids}
 
-        wait_time = 5 * (attempt + 1)
-        time.sleep(wait_time)
-
-    raise Exception("❌ Overpass API failed after multiple retries")
-
-
-def fetch_pois(lat: float, lon: float, radius_km: float) -> dict:
-    radius_m = radius_km * 1000
-    
-# JSON (string from API) → Python Dictionary (usable object)
-
-    query = f"""
-    [out:json][timeout:180];
-    (
-      node["amenity"="hospital"](around:{radius_m},{lat},{lon});
-      node["amenity"="clinic"](around:{radius_m},{lat},{lon});
-      node["amenity"="veterinary"](around:{radius_m},{lat},{lon});
-
-      node["highway"="bus_stop"](around:{radius_m},{lat},{lon});
-      node["amenity"="fuel"](around:{radius_m},{lat},{lon});
-      node["amenity"="school"](around:{radius_m},{lat},{lon});
-      node["amenity"="restaurant"](around:{radius_m},{lat},{lon});
-      node["amenity"="pharmacy"](around:{radius_m},{lat},{lon});
-
-      way["building"](around:{radius_m},{lat},{lon});
-    );
-    out center;
-    """
-
-    data = safe_overpass_request(query)
-
-    human_hospitals, vet_hospitals = [], []
-    bus_stops, fuel_stations       = [], []
-    schools, restaurants, pharmacies, buildings = [], [], [], []
-
-    for element in data.get("elements", []):
-        tags    = element.get("tags", {})
-        amenity = tags.get("amenity", "")
-        highway = tags.get("highway", "")
-
-        if element["type"] == "node":
-            el_lat = element.get("lat")
-            el_lon = element.get("lon")
-        elif element["type"] == "way":
-            center = element.get("center", {})
-            el_lat = center.get("lat")
-            el_lon = center.get("lon")
-        else:
-            continue
-
-        if not el_lat or not el_lon:
-            continue
-
-        item = {
-            "name": tags.get("name", "Unknown"),
-            "lat":  el_lat,
-            "lon":  el_lon
+        #  POI queries
+        queries = {
+            "Building": """
+                SELECT name, sub_category, lat, lon FROM data.building
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Business": """
+                SELECT name, sub_category, lat, lon FROM data.business
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Finance": """
+                SELECT name, sub_category, lat, lon FROM data.finance
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Food": """
+                SELECT name, sub_category, lat, lon FROM data.food
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Health Care": """
+                SELECT name, sub_category, lat, lon FROM data.health_care
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Infrastructure": """
+                SELECT name, sub_category, lat, lon FROM data.infra_str
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Tourism": """
+                SELECT name, sub_category, lat, lon FROM data.tourism
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Transport": """
+                SELECT name, sub_category, lat, lon FROM data.transport
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Recreation": """
+                SELECT name, sub_category, lat, lon FROM data.recreation
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Shops": """
+                SELECT name, sub_category, lat, lon FROM data.shops
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Education": """
+                SELECT name, sub_category, lat, lon FROM data.education
+                WHERE grid_id = ANY(:grid_ids)
+            """,
+            "Religious": """
+                SELECT name, sub_category, lat, lon FROM data.religious
+                WHERE grid_id = ANY(:grid_ids)
+            """
         }
 
-        if amenity in ["hospital", "clinic"]:
-            human_hospitals.append(item)
-        elif amenity == "veterinary":
-            vet_hospitals.append(item)
-        elif highway == "bus_stop":
-            bus_stops.append(item)
-        elif amenity == "fuel":
-            fuel_stations.append(item)
-        elif amenity == "school":
-            schools.append(item)
-        elif amenity == "restaurant":
-            restaurants.append(item)
-        elif amenity == "pharmacy":
-            pharmacies.append(item)
-        elif element["type"] == "way" and tags.get("building"):
-            buildings.append(item)
+        pois = {}
+        summary = {}
 
-    return {
-        "human_hospitals": human_hospitals,
-        "vet_hospitals":   vet_hospitals,
-        "bus_stops":       bus_stops,
-        "fuel_stations":   fuel_stations,
-        "schools":         schools,
-        "restaurants":     restaurants,
-        "pharmacies":      pharmacies,
-        "buildings":       buildings,
-        "summary": {
-            "human_hospitals": len(human_hospitals),
-            "vet_hospitals":   len(vet_hospitals),
-            "bus_stops":       len(bus_stops),
-            "fuel_stations":   len(fuel_stations),
-            "schools":         len(schools),
-            "restaurants":     len(restaurants),
-            "pharmacies":      len(pharmacies),
-            "buildings":       len(buildings),
+        #  Execute POI queries
+        for key, query in queries.items():
+            result = db.execute(text(query), params)
+            rows = result.fetchall()
+
+            pois[key] = [
+                {
+                    "name": row[0],
+                    "sub_category": row[1],
+                    "lat": row[2],
+                    "lon": row[3]
+                }
+                for row in rows
+            ]
+
+            summary[key] = len(rows)
+
+        #  Final response structure
+        response = {
+            "grids": grids,
+            "pois": pois,
+            "summary": summary
         }
-    }
 
+        return response
 
+    except Exception as e:
+        return {"error": str(e)}
 
-
-
-
-
-
-
-
-
-
-# import json
-
-# def convert_to_geojson(poi_data):
-#     features = []
-
-#     def add_features(category, items):
-#         for item in items:
-#             features.append({
-#                 "type": "Feature",
-#                 "properties": {
-#                     "name": item["name"],
-#                     "category": category
-#                 },
-#                 "geometry": {
-#                     "type": "Point",
-#                     "coordinates": [item["lon"], item["lat"]]
-#                 }
-#             })
-
-#     # Add all categories
-#     add_features("human_hospitals", poi_data["human_hospitals"])
-#     add_features("vet_hospitals", poi_data["vet_hospitals"])
-#     add_features("bus_stops", poi_data["bus_stops"])
-#     add_features("fuel_stations", poi_data["fuel_stations"])
-#     add_features("schools", poi_data["schools"])
-#     add_features("restaurants", poi_data["restaurants"])
-#     add_features("pharmacies", poi_data["pharmacies"])
-#     add_features("buildings", poi_data["buildings"])
-
-#     geojson = {
-#         "type": "FeatureCollection",
-#         "features": features
-#     }
-
-#     return geojson
-
-
-# if __name__ == "__main__":
-#     LAT = 23.1828
-#     LON = 75.7680
-#     RADIUS_KM = 1
-
-#     print("📡 Fetching OSM data for Mahakal (1 km radius)...")
-
-#     poi_data = fetch_pois(LAT, LON, RADIUS_KM)
-
-#     print("✅ Summary:")
-#     print(json.dumps(poi_data["summary"], indent=2))
-
-#     geojson_data = convert_to_geojson(poi_data)
-
-#     output_file = "mahakal_pois.geojson"
-
-#     with open(output_file, "w", encoding="utf-8") as f:
-#         json.dump(geojson_data, f, indent=2)
-
-#     print(f"📁 GeoJSON saved: {output_file}")
+    finally:
+        db.close()
