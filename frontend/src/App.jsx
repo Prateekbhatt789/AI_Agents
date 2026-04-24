@@ -270,7 +270,7 @@ export default function App() {
               <span className="text-[#64ae09]">Intelligence</span>
             </p>
             <span className="block text-xl leading-none font-bold tracking-wide text-[#019ee1]">
-              Locate > Analyze > Act
+              Locate <span className="mx-2">&gt;</span> Analyze <span className="mx-2">&gt;</span > Act
             </span>
           </div>
 
