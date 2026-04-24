@@ -33,7 +33,9 @@ export default function SidePanel({ lat,
     setSessionId, setRadiusKm,
     addMessage,
     openContextualPanel,
-    setSelectedCategories }
+    setSelectedCategories,
+    // to show grid over map
+    setGridData, setShowGrid, showGrid }
 ) {
     // const [lat, setLat] = useState(null)
     // const [lon, setLon] = useState(null)
@@ -85,6 +87,7 @@ export default function SidePanel({ lat,
             const pois = await fetchPOIs(lat, lon, radiusKm)
             setPoiData(pois)
             setSummary(pois.summary)
+            setGridData(pois.grids ?? [])   // to show grid over map
 
             setStatus('Storing data and building spatial grid...')
             const analyzeResult = await analyzeLocation(
@@ -139,6 +142,9 @@ export default function SidePanel({ lat,
                 isAnalyzing={isAnalyzing}
                 locationName={locationName}
                 setRadiusKm={setRadiusKm}
+                // to grids over the map
+                showGrid={showGrid}
+                setShowGrid={setShowGrid}
             />
             <Dashboard
                 locationName={locationName}

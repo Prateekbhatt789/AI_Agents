@@ -97,15 +97,21 @@ export default function App() {
   const [contextualMode, setContextualMode] = useState('panel')
   const [selectedCategories, setSelectedCategories] = useState([])
 
+  // to show grid over map 
+  const [gridData, setGridData] = useState([])
+  const [showGrid, setShowGrid] = useState(false)
+  // for enabling and disabling the button 
+  const SHOW_GRID_BUTTON = import.meta.env.VITE_SHOW_GRID_BUTTON === 'true'
+
   function openContextualPanel(mode = 'panel') {
     setContextualMode(mode)
     setShowChat(true)
   }
-  
+
   async function handleSearch(query, radius) {
     setStatus('Searching...')
     setRadiusKm(radius)
-    
+
     try {
       const data = await searchLocation(query)
 
@@ -148,6 +154,8 @@ export default function App() {
       const pois = await fetchPOIs(lat, lon, radiusKm)
       setPoiData(pois)
       setSummary(pois.summary)
+      // to show the grid layer over the map
+      setGridData(pois.grids ?? [])   // ← add this
 
       setStatus('Storing data and building spatial grid...')
       const analyzeResult = await analyzeLocation(
@@ -331,6 +339,10 @@ export default function App() {
           addMessage={addMessage}
           setSelectedCategories={setSelectedCategories}
           openContextualPanel={openContextualPanel}
+          // to show grid over map
+          setGridData={setGridData}
+          showGrid={showGrid}
+          setShowGrid={setShowGrid}
         />
         {showChat && (
           <div className="relative z-30 h-full w-80 shrink-0">
@@ -347,6 +359,34 @@ export default function App() {
           </div>
         )}
         {/* Map container */}
+        {/* <div className="relative flex-1 z-0 overflow-hidden">
+          {!lat && !isAnalyzing && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-slate-500">
+              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-[2rem] border border-white/70 bg-white/75 text-cyan-700 shadow-2xl shadow-slate-900/10 backdrop-blur-xl">
+                <GlobeIcon className="h-9 w-9" />
+              </div>
+              <p className="text-sm font-medium">Search or click on the map to select a location</p>
+            </div>
+          )}
+
+          {isAnalyzing && (
+            <AnalyzeLoader status={status} />
+          )}
+
+          <MapViewer
+            lat={lat}
+            lon={lon}
+            radiusKm={radiusKm}
+            poiData={poiData}
+            suggestions={suggestions}
+            onMapClick={handleMapClick}
+            isAnalyzing={isAnalyzing}
+            isAnalyzed={isAnalyzed}
+            trigger={showChat}
+            gridData={gridData}
+            showGrid={showGrid}
+          />
+        </div> */}
         <div className="relative flex-1 z-0 overflow-hidden">
           {!lat && !isAnalyzing && (
             <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-slate-500">
@@ -360,7 +400,23 @@ export default function App() {
           {isAnalyzing && (
             <AnalyzeLoader status={status} />
           )}
-        
+
+          {SHOW_GRID_BUTTON && isAnalyzed && (
+            <button
+              onClick={() => setShowGrid(prev => !prev)}
+              className={`absolute bottom-3 left-3 z-[1000] rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-md backdrop-blur-sm transition-all
+                  ${showGrid
+                  ? 'bg-cyan-600 text-white border-cyan-700'
+                  : 'bg-white/90 text-slate-700 border-slate-300 hover:border-cyan-400 hover:text-cyan-600'
+                }`}
+            >
+              {showGrid ? 'Hide Grid' : 'Show Grid'}
+            </button>
+
+
+
+          )}
+
           <MapViewer
             lat={lat}
             lon={lon}
@@ -371,6 +427,8 @@ export default function App() {
             isAnalyzing={isAnalyzing}
             isAnalyzed={isAnalyzed}
             trigger={showChat}
+            gridData={gridData}
+            showGrid={showGrid}
           />
         </div>
 

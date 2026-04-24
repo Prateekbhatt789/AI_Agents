@@ -8,11 +8,14 @@ import {
     Polygon,
     Polyline,
     useMap,
-    useMapEvents
+    useMapEvents,
+    GeoJSON
 } from 'react-leaflet'
 import L from 'leaflet'
 import '../utils/fixLeafletIcons'
 import { delhiBoundaryRing, isWithinDelhiBoundary } from '../utils/delhiBoundary'
+
+
 
 const DEFAULT_CENTER = [28.6139, 77.209]
 const WORLD_MASK_RING = [
@@ -134,18 +137,28 @@ function MapClickHandler({ onMapClick, isAnalyzing, isAnalyzed, centerLat, cente
 }
 
 const CATEGORY_STYLES = {
-    human_hospitals: { color: '#ef4444', symbol: 'H' },
-    vet_hospitals: { color: '#f59e0b', symbol: 'V' },
-    bus_stops: { color: '#22c55e', symbol: 'B' },
-    fuel_stations: { color: '#f97316', symbol: 'F' },
-    schools: { color: '#8b5cf6', symbol: 'S' },
-    restaurants: { color: '#ec4899', symbol: 'R' },
-    pharmacies: { color: '#06b6d4', symbol: 'P' },
-    buildings: { color: '#64748b', symbol: 'BLD' },
+    building: { color: '#64748b', symbol: 'BLD' },
+    business: { color: '#0ea5e9', symbol: 'BUS' },
+    finance: { color: '#22c55e', symbol: '₹' },
+    food: { color: '#f43f5e', symbol: 'F' },
+    health_care: { color: '#ef4444', symbol: 'HC' },
+    infrastructure: { color: '#6b7280', symbol: 'INF' },
+    tourism: { color: '#eab308', symbol: 'T' },
+    transport: { color: '#3b82f6', symbol: 'TR' },
+    recreation: { color: '#10b981', symbol: 'R' },
+    shops: { color: '#f59e0b', symbol: 'S' },
+    education: { color: '#8b5cf6', symbol: 'ED' },
+    religious: { color: '#a855f7', symbol: 'REL' },
 }
 
 function createColoredIcon(category) {
-    const style = CATEGORY_STYLES[category] || { color: '#60a5fa', symbol: 'POI' }
+    const normalized = category.toLowerCase().replace(/\s+/g, '_')
+
+    const style =
+        CATEGORY_STYLES[normalized] ||
+        CATEGORY_STYLES[category] ||
+        { color: '#60a5fa', symbol: 'POI' }
+
     return L.divIcon({
         className: '',
         html: `
@@ -227,7 +240,9 @@ export default function MapViewer({
     lat, lon, radiusKm, poiData,
     suggestions,
     onMapClick,
-    isAnalyzing, isAnalyzed, trigger
+    isAnalyzing, isAnalyzed, trigger,
+    gridData = [],
+    showGrid = false
 }) {
     return (
         <MapContainer
@@ -320,26 +335,60 @@ export default function MapViewer({
                 />
             )}
 
-            {poiData && Object.entries(poiData).map(([category, items]) => {
-                if (category === 'summary' || !Array.isArray(items)) return null
+            {showGrid && gridData.map((cell) => {
+                try {
+                    const geom = typeof cell.geom === 'string' ? JSON.parse(cell.geom) : cell.geom
+                    const positions = geom.coordinates[0].map(([lng, lat]) => [lat, lng])
+                    const opacity = Math.min(cell.score / 100, 1)
+                    { console.log('showGrid:', showGrid, 'gridData length:', gridData?.length, 'sample:', gridData?.[0]) }
+
+                    return (
+                        <Polygon
+                            key={cell.grid_id}
+                            positions={positions}
+                            pathOptions={{
+                                color: '#0891b2',
+                                weight: 0.8,
+                                fillColor: `hsl(${Math.round(opacity * 120)}, 80%, 45%)`,
+                                fillOpacity: 0.35,
+                            }}
+                        >
+                            <Popup>
+                                <strong>Grid {cell.grid_id}</strong><br />
+                                Score: {cell.score}<br />
+                                Population: {cell.population}
+                            </Popup>
+                        </Polygon>
+                    )
+                } catch {
+                    return null
+                }
+            })}
+
+            {poiData?.pois && Object.entries(poiData.pois).map(([category, items]) => {
+                if (!Array.isArray(items)) return null
 
                 const icon = createColoredIcon(category)
                 const style = CATEGORY_STYLES[category] || { symbol: 'POI' }
 
-                return items.slice(0, 50).map((item, i) => (
-                    <Marker
-                        key={`${category}-${i}`}
-                        position={[item.lat, item.lon]}
-                        icon={icon}
-                    >
-                        <Popup>
-                            <strong>{style.symbol} {item.name}</strong><br />
-                            <small style={{ color: '#64748b' }}>
-                                {category.replace(/_/g, ' ').toUpperCase()}
-                            </small>
-                        </Popup>
-                    </Marker>
-                ))
+                return items.slice(0, 100).map((item, i) => {
+                    if (!item.lat || !item.lon) return null
+
+                    return (
+                        <Marker
+                            key={`${category}-${i}`}
+                            position={[item.lat, item.lon]}
+                            icon={icon}
+                        >
+                            <Popup>
+                                <strong>{style.symbol} {item.name || "Unknown"}</strong><br />
+                                <small style={{ color: '#64748b' }}>
+                                    {category.toUpperCase()}
+                                </small>
+                            </Popup>
+                        </Marker>
+                    )
+                })
             })}
 
             {suggestions && suggestions.map(s => (
@@ -369,7 +418,7 @@ export default function MapViewer({
                     </Marker>
                 ) : null
             ))}
-            {/* Your Custom Attribution */}
+
             <div className='absolute bottom-2 right-2 z-[1000] flex items-center gap-1 bg-black/80 backdrop-blur-sm rounded-full text-white px-4 py-1.5 text-xs shadow-lg border border-white/10'>
                 <span className="opacity-80">Powered By</span>
                 <span className="font-bold tracking-wide">ML Infomap</span>
