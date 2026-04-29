@@ -195,6 +195,17 @@ function normalizeKey(value) {
         .replace(/[_\s-]+/g, '_')
 }
 
+function wrapIconHtml(iconHtml) {
+    if (!iconHtml) return ''
+
+    const trimmed = String(iconHtml).trim()
+    if (trimmed.startsWith('<')) {
+        return trimmed
+    }
+
+    return `<img src="${trimmed}" alt="icon" style="max-width:100%; max-height:100%; display:block;" />`
+}
+
 function createCategoryIcon(category, iconHtml) {
     if (!iconHtml) {
         return createColoredIcon(category)
@@ -202,6 +213,7 @@ function createCategoryIcon(category, iconHtml) {
 
     const normalized = normalizeKey(category)
     const style = CATEGORY_STYLES[normalized] || { color: '#60a5fa' }
+    const htmlContent = wrapIconHtml(iconHtml)
 
     return L.divIcon({
         className: '',
@@ -217,8 +229,8 @@ function createCategoryIcon(category, iconHtml) {
                 justify-content: center;
                 box-shadow: 0 10px 22px rgba(15,23,42,0.22);
             ">
-                <div style="width: 20px; height: 20px; min-width: 20px; min-height: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                    ${iconHtml}
+                <div style="width: 24px; height: 24px; min-width: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    ${htmlContent}
                 </div>
             </div>
         `,
@@ -442,7 +454,7 @@ export default function MapViewer({
                 if (!Array.isArray(items)) return null
 
                 const normalizedCategory = normalizeKey(category)
-                const iconHtml = categoryIcons[normalizedCategory]
+                const iconHtml = categoryIcons[normalizedCategory] || categoryIcons[normalizeKey(category)]
                 const icon = createCategoryIcon(category, iconHtml)
                 const style = CATEGORY_STYLES[normalizedCategory] || CATEGORY_STYLES[category] || { symbol: 'POI' }
 
