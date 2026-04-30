@@ -165,26 +165,26 @@ function createColoredIcon(category) {
         html: `
             <div style="
                 background: radial-gradient(circle at top, rgba(255,255,255,0.55), transparent 40%), ${style.color};
-                width: 34px;
-                height: 34px;
+                width: 28px;
+                height: 28px;
                 border-radius: 999px;
                 border: 2px solid rgba(255,255,255,0.95);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 color: white;
-                font-size: ${style.symbol.length > 1 ? '9px' : '13px'};
+                font-size: ${style.symbol.length > 1 ? '8px' : '12px'};
                 font-weight: 700;
                 letter-spacing: 0.08em;
-                box-shadow: 0 10px 22px rgba(15,23,42,0.28);
+                box-shadow: 0 8px 18px rgba(15,23,42,0.22);
                 font-family: Inter, system-ui, sans-serif;
             ">
                 ${style.symbol}
             </div>
         `,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
-        popupAnchor: [0, -17],
+        iconSize: [16, 16],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -14],
     })
 }
 
@@ -220,23 +220,23 @@ function createCategoryIcon(category, iconHtml) {
         html: `
             <div style="
                 background: radial-gradient(circle at top, rgba(255,255,255,0.55), transparent 40%), ${style.color};
-                width: 36px;
-                height: 36px;
+                width: 30px;
+                height: 30px;
                 border-radius: 999px;
                 border: 2px solid rgba(255,255,255,0.95);
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                box-shadow: 0 10px 22px rgba(15,23,42,0.22);
+                box-shadow: 0 8px 18px rgba(15,23,42,0.22);
             ">
-                <div style="width: 24px; height: 24px; min-width: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <div style="width: 20px; height: 20px; min-width: 20px; min-height: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
                     ${htmlContent}
                 </div>
             </div>
         `,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-        popupAnchor: [0, -18],
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+        popupAnchor: [0, -15],
     })
 }
 
