@@ -192,7 +192,7 @@ function normalizeKey(value) {
     return String(value || '')
         .trim()
         .toLowerCase()
-        .replace(/[_\s-]+/g, '_')
+        .replace(/[_\s-]+/g, '')
 }
 
 function wrapIconHtml(iconHtml) {
@@ -289,15 +289,134 @@ function ResizeMap({ trigger }) {
 
     return null;
 }
+
+function LegendControl({ legendItems, selectedCategories, onToggleCategory, onReset }) {
+    const map = useMap();
+
+    useEffect(() => {
+        if (!legendItems || !legendItems.length) return;
+
+        const control = L.control({ position: 'bottomleft' });
+
+        control.onAdd = function () {
+            const container = L.DomUtil.create('div', 'leaflet-bar legend-control');
+            container.style.display = 'None';
+            container.style.background = 'rgba(255,255,255,0.94)';
+            container.style.border = '1px solid rgba(148,163,184,0.25)';
+            container.style.borderRadius = '18px';
+            container.style.boxShadow = '0 18px 50px rgba(15,23,42,0.12)';
+            container.style.padding = '5px 4px';
+            container.style.maxWidth = '300px';
+            container.style.bottom = '45px';
+            container.style.maxHeight = '200px';
+            container.style.overflow = 'hidden';
+            container.style.fontFamily = 'Inter, system-ui, sans-serif';
+            container.style.color = '#0f172a';
+            container.style.zIndex = 650;
+            container.style.pointerEvents = 'auto';
+
+            const header = document.createElement('div');
+            header.style.display = 'flex';
+            header.style.justifyContent = 'space-between';
+            header.style.alignItems = 'center';
+            header.style.marginBottom = '10px';
+
+            const title = document.createElement('div');
+            title.textContent = 'Layer legend';
+            title.style.fontSize = '13px';
+            title.style.fontWeight = '700';
+            header.appendChild(title);
+
+            const reset = document.createElement('button');
+            reset.textContent = 'Reset';
+            reset.style.fontSize = '11px';
+            reset.style.fontWeight = '700';
+            reset.style.color = '#0f172a';
+            reset.style.background = 'rgba(241,245,249,0.95)';
+            reset.style.border = '1px solid rgba(148,163,184,0.35)';
+            reset.style.borderRadius = '999px';
+            reset.style.padding = '3px 8px';
+            reset.style.cursor = 'pointer';
+            reset.addEventListener('click', onReset);
+            header.appendChild(reset);
+            container.appendChild(header);
+
+            const list = document.createElement('div');
+            list.style.maxHeight = '220px';
+            list.style.overflowY = 'auto';
+            list.style.display = 'grid';
+            list.style.gap = '6px';
+
+            legendItems.forEach((item) => {
+                const key = item.key;
+                const isSelected = selectedCategories.includes(key);
+
+                const itemRow = document.createElement('div');
+                itemRow.style.display = 'flex';
+                itemRow.style.alignItems = 'center';
+                itemRow.style.gap = '10px';
+                itemRow.style.padding = '8px 10px';
+                itemRow.style.minHeight = '34px';
+                itemRow.style.borderRadius = '14px';
+                itemRow.style.border = isSelected ? '1px solid #0ea5e9' : '1px solid rgba(148,163,184,0.3)';
+                itemRow.style.background = isSelected ? '#eff6ff' : '#f8fafc';
+                itemRow.style.color = '#0f172a';
+                itemRow.style.cursor = 'pointer';
+                itemRow.style.fontSize = '13px';
+                itemRow.style.fontWeight = '600';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = isSelected;
+                checkbox.style.width = '16px';
+                checkbox.style.height = '16px';
+                checkbox.style.margin = '0';
+                checkbox.style.cursor = 'pointer';
+                checkbox.addEventListener('change', () => onToggleCategory(key));
+                itemRow.appendChild(checkbox);
+
+                const text = document.createElement('span');
+                text.textContent = item.label;
+                text.style.flex = '1';
+                text.style.whiteSpace = 'nowrap';
+                text.style.overflow = 'hidden';
+                text.style.textOverflow = 'ellipsis';
+                itemRow.appendChild(text);
+
+                itemRow.addEventListener('click', (event) => {
+                    if (event.target !== checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        onToggleCategory(key);
+                    }
+                });
+
+                list.appendChild(itemRow);
+            });
+
+            container.appendChild(list);
+            L.DomEvent.disableClickPropagation(container);
+            L.DomEvent.disableScrollPropagation(container);
+            return container;
+        };
+
+        control.addTo(map);
+        return () => control.remove();
+    }, [map, legendItems, selectedCategories, onToggleCategory, onReset]);
+
+    return null;
+}
 export default function MapViewer({
     lat, lon, radiusKm, poiData,
     suggestions,
     onMapClick,
     isAnalyzing, isAnalyzed, trigger,
     gridData = [],
-    showGrid = false
+    showGrid = false,
+    selectedCategories = [],
+    setSelectedCategories,
 }) {
     const [categoryIcons, setCategoryIcons] = useState({})
+    const [categoryList, setCategoryList] = useState([])
 
     useEffect(() => {
         let mounted = true
@@ -308,15 +427,23 @@ export default function MapViewer({
                 if (!mounted) return
 
                 const map = {}
+                const list = []
                 categories.forEach((item) => {
-                    const key = normalizeKey(item.key || item.label)
-                    const labelKey = normalizeKey(item.label)
-                    if (item.icon) {
-                        map[key] = item.icon
-                        map[labelKey] = item.icon
+                    const normalizedKey = normalizeKey(item.label || item.key)
+                    const iconValue = item.icon || ''
+                    if (iconValue) {
+                        map[normalizedKey] = iconValue
                     }
+
+                    list.push({
+                        key: normalizedKey,
+                        label: item.label || item.key,
+                        icon: iconValue,
+                    })
                 })
+
                 setCategoryIcons(map)
+                setCategoryList(list)
             } catch (error) {
                 console.error('Failed to load category icons for map markers:', error)
             }
@@ -329,22 +456,46 @@ export default function MapViewer({
         }
     }, [])
 
+    const activePoiKeys = poiData?.pois ? Object.keys(poiData.pois).map(normalizeKey) : []
+    const legendItems = categoryList.length > 0
+        ? categoryList.filter((item) => activePoiKeys.includes(item.key))
+        : activePoiKeys.map((categoryKey) => ({
+            key: categoryKey,
+            label: categoryKey.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+            icon: categoryIcons[categoryKey]
+        }))
+    const showLegend = poiData?.pois && activePoiKeys.length > 0
+
+    const resetLegendSelection = () => {
+        if (!setSelectedCategories) return
+        setSelectedCategories(activePoiKeys)
+    }
+
+    const handleToggleCategory = (key) => {
+        if (!setSelectedCategories) return
+        const nextSelectedCategories = selectedCategories.includes(key)
+            ? selectedCategories.filter((k) => k !== key)
+            : [...selectedCategories, key]
+        setSelectedCategories(nextSelectedCategories)
+    }
+
     return (
-        <MapContainer
-            center={DEFAULT_CENTER}
-            zoom={18}
-            style={{ width: '100%', height: '100%' }}
-            attributionControl={false}
-        >
-            <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution="&copy; OpenStreetMap contributors"
-            />
+        <div className="relative h-full">
+            <MapContainer
+                center={DEFAULT_CENTER}
+                zoom={18}
+                style={{ width: '100%', height: '100%' }}
+                attributionControl={false}
+            >
+                <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap contributors"
+                />
 
-            <FitToDelhiBoundary hasSelectedLocation={Boolean(lat && lon)} />
-            <ConstrainToDelhiExtent />
+                <FitToDelhiBoundary hasSelectedLocation={Boolean(lat && lon)} />
+                <ConstrainToDelhiExtent />
 
-            {delhiBoundaryLatLngs.length > 0 && (
+                {delhiBoundaryLatLngs.length > 0 && (
                 <>
                     <Polygon
                         positions={[WORLD_MASK_RING, delhiBoundaryLatLngs]}
@@ -394,6 +545,14 @@ export default function MapViewer({
 
             {lat && lon && <FlyToLocation lat={lat} lon={lon} />}
             <ResizeMap trigger={trigger} />
+            {showLegend && (
+                <LegendControl
+                    legendItems={legendItems}
+                    selectedCategories={selectedCategories}
+                    onToggleCategory={handleToggleCategory}
+                    onReset={resetLegendSelection}
+                />
+            )}
             {suggestions && suggestions.length > 0 && (
                 <FlyToSuggestion suggestions={suggestions} />
             )}
@@ -454,7 +613,10 @@ export default function MapViewer({
                 if (!Array.isArray(items)) return null
 
                 const normalizedCategory = normalizeKey(category)
-                const iconHtml = categoryIcons[normalizedCategory] || categoryIcons[normalizeKey(category)]
+                const isVisible = selectedCategories.includes(normalizedCategory)
+                if (!isVisible) return null
+
+                const iconHtml = categoryIcons[normalizedCategory]
                 const icon = createCategoryIcon(category, iconHtml)
                 const style = CATEGORY_STYLES[normalizedCategory] || CATEGORY_STYLES[category] || { symbol: 'POI' }
 
@@ -511,5 +673,6 @@ export default function MapViewer({
                 <span className="font-bold tracking-wide">ML Infomap</span>
             </div>
         </MapContainer>
+        </div>
     )
 }

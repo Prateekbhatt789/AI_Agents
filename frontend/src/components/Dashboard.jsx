@@ -14,8 +14,7 @@ import {
 import { useState, useEffect } from 'react';
 import { fetchDashboardCategories,fetchCategoriesCount } from '../services/api';
 
-export default function Dashboard({ locationName, summary, lat, lon, radiusKm, onDownload, onItemClick, onSelectionChange }) {
-    const [selectedCategories, setSelectedCategories] = useState([]);
+export default function Dashboard({ locationName, summary, lat, lon, radiusKm, onDownload, onItemClick, onSelectionChange, selectedCategories = [] }) {
     const [categories, setCategories] = useState([]);
 
     useEffect(() => {
@@ -42,10 +41,12 @@ export default function Dashboard({ locationName, summary, lat, lon, radiusKm, o
 
                 const enriched = categoryList
                     .map((item) => {
-                        const keyMatch = normalizedCounts[normalizeKey(item.key)];
+                        const normalizedLabel = normalizeKey(item.label || item.key);
+                        const keyMatch = normalizedCounts[normalizedLabel];
                         const labelMatch = normalizedCounts[normalizeKey(item.label)];
                         return {
                             ...item,
+                            key: normalizedLabel,
                             count: keyMatch ?? labelMatch ?? 0
                         };
                     })
@@ -69,7 +70,6 @@ export default function Dashboard({ locationName, summary, lat, lon, radiusKm, o
             ? selectedCategories.filter((k) => k !== key)
             : [...selectedCategories, key];
 
-        setSelectedCategories(nextSelectedCategories);
         onSelectionChange?.(nextSelectedCategories);
         onItemClick?.(nextSelectedCategories);
     };

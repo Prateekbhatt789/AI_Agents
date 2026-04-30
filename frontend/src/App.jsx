@@ -13,6 +13,10 @@ import {
 import ContextualPanel from './components/ContextualPanel'
 import { isWithinDelhiBoundary } from './utils/delhiBoundary'
 
+function normalizeKey(value) {
+  return String(value || '').toLowerCase().replace(/[_\s-]+/g, '_')
+}
+
 function AnalyzeLoader({ status }) {
   return (
     <div style={{
@@ -154,6 +158,7 @@ export default function App() {
       const pois = await fetchPOIs(lat, lon, radiusKm)
       setPoiData(pois)
       setSummary(pois.summary)
+      setSelectedCategories(Object.keys(pois.pois || {}).map(normalizeKey))
       // to show the grid layer over the map
       setGridData(pois.grids ?? [])   // ← add this
 
@@ -332,12 +337,14 @@ export default function App() {
           setLon={setLon}
           setLocationName={setLocationName}
           setPoiData={setPoiData}
+          poiData={poiData}
           setStatus={setStatus}
           setRadiusKm={setRadiusKm}
           setSuggestions={setSuggestions}
           setSessionId={setSessionId}
           addMessage={addMessage}
           setSelectedCategories={setSelectedCategories}
+          selectedCategories={selectedCategories}
           openContextualPanel={openContextualPanel}
           // to show grid over map
           setGridData={setGridData}
@@ -430,6 +437,8 @@ export default function App() {
             trigger={showChat}
             gridData={gridData}
             showGrid={showGrid}
+            selectedCategories={selectedCategories}
+            setSelectedCategories={setSelectedCategories}
           />
         </div>
 

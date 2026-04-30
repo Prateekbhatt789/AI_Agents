@@ -11,6 +11,13 @@ import {
 } from '../services/api'
 import { isWithinDelhiBoundary } from '../utils/delhiBoundary'
 
+function normalizeKey(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[_\s-]+/g, '')
+}
+
 export default function SidePanel({ lat,
     lon,
     radiusKm,
@@ -30,12 +37,17 @@ export default function SidePanel({ lat,
     setPoiData,
     setStatus,
     setSuggestions,
-    setSessionId, setRadiusKm,
+    setSessionId,
+    setRadiusKm,
     addMessage,
     openContextualPanel,
     setSelectedCategories,
+    selectedCategories,
+    poiData,
     // to show grid over map
-    setGridData, setShowGrid, showGrid }
+    setGridData,
+    setShowGrid,
+    showGrid }
 ) {
     // const [lat, setLat] = useState(null)
     // const [lon, setLon] = useState(null)
@@ -157,7 +169,51 @@ export default function SidePanel({ lat,
                         onDownload={handleDownload}
                         onItemClick={() => openContextualPanel?.('panel')}
                         onSelectionChange={setSelectedCategories}
+                        selectedCategories={selectedCategories}
                     />
+
+                    {/* {poiData?.pois && (
+                        <div className="rounded-xl border border-white/55 bg-white/72 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+                            <div className="mb-3 flex items-center justify-between gap-2">
+                                <div>
+                                    <h4 className="text-base font-semibold text-slate-900">Layer legend</h4>
+                                    <p className="text-xs text-slate-500">Toggle POI categories</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedCategories(Object.keys(poiData.pois).map(normalizeKey))}
+                                    className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                >
+                                    Reset
+                                </button>
+                            </div>
+                            <div className="grid max-h-64 gap-2 overflow-y-auto">
+                                {Object.keys(poiData.pois).map((category) => {
+                                    const key = normalizeKey(category)
+                                    const isSelected = selectedCategories.includes(key)
+                                    return (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => {
+                                                const next = isSelected
+                                                    ? selectedCategories.filter((k) => k !== key)
+                                                    : [...selectedCategories, key]
+                                                setSelectedCategories(next)
+                                            }}
+                                            className={`flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-left transition ${isSelected ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'}`}
+                                        >
+                                            <span className="text-sm font-medium truncate">{category}</span>
+                                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                                                {isSelected ? 'Visible' : 'Hidden'}
+                                            </span>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )} */}
+
                     <div className="flex w-full items-center justify-center gap-1 rounded-2xl  bg-white/72  py-2 text-sm font-semibold text-slate-900 transition hover:bg-[#14b8a6] hover:text-white hover:border hover:border-white">
                         <button
                             onClick={handleDownload}
