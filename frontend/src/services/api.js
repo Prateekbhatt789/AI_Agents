@@ -1,4 +1,4 @@
-const BASE = 'http://192.168.1.13:8000/api'
+const BASE = 'http://192.168.1.16:8000/api'
 
 // ── Session ID — stored after /analyze, sent on every /chat ──
 // Also accepts sessionId passed explicitly from App.jsx
@@ -136,7 +136,7 @@ export async function fetchDashboardCategories() {
         throw error;
     }
 }
-export async function fetchCategoriesCount(latitude,longitude,radius) {
+export async function fetchCategoriesCount(latitude, longitude, radius) {
     try {
         const response = await fetch(`${BASE}/fetch-pois`, {
             method: "POST",
