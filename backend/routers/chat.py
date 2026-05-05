@@ -4,13 +4,9 @@ from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from services.agent import ask_agent, set_session, create_session
-from services.pinecone_store import store_pois, namespace_exists, make_namespace
+from services.pinecone_store import store_pois, make_namespace, namespace_exists  # ✅ added namespace_exists
 
 router = APIRouter()
-
-# ────────────────────────────────────────────────────
-# SESSION STORE — per-user, keyed by session_id
-# ────────────────────────────────────────────────────
 
 _sessions      : dict[str, dict] = {}
 _sessions_lock : threading.Lock  = threading.Lock()
@@ -26,10 +22,6 @@ def _put_session(session_id: str, session: dict):
         _sessions[session_id] = session
 
 
-# ────────────────────────────────────────────────────
-# REQUEST MODELS
-# ────────────────────────────────────────────────────
-
 class AnalyzeRequest(BaseModel):
     location:  str
     lat:       float
@@ -42,15 +34,8 @@ class ChatRequest(BaseModel):
     message: str
 
 
-# ────────────────────────────────────────────────────
-# STATUS
-# ────────────────────────────────────────────────────
-
 @router.get("/status")
 async def status(x_session_id: str = Header(default=None)):
-    """
-    Returns session status for the given session_id header.
-    """
     if not x_session_id:
         return {"status": "ok", "location_loaded": False}
 
@@ -67,18 +52,10 @@ async def status(x_session_id: str = Header(default=None)):
     }
 
 
-# ────────────────────────────────────────────────────
-# ANALYZE
-# ────────────────────────────────────────────────────
-
 @router.post("/analyze")
 async def analyze(request: AnalyzeRequest):
-    """
-    Creates a fresh session, populates it, returns session_id.
-    Client must send X-Session-Id header on all /chat requests.
-    """
     try:
-        namespace      = make_namespace(request.location)
+        namespace      = make_namespace(request.location, request.radius_km)  
         already_exists = namespace_exists(namespace)
 
         session    = create_session()
@@ -93,10 +70,12 @@ async def analyze(request: AnalyzeRequest):
             lon      = request.lon,
             poi_data = request.poi_data
         )
+        session["namespace"] = namespace
 
         _put_session(session_id, session)
 
         if already_exists:
+            print(f" Cache hit — reusing '{namespace}'")
             return {
                 "status":         "ready",
                 "session_id":     session_id,
@@ -104,8 +83,8 @@ async def analyze(request: AnalyzeRequest):
                 "cached":         True
             }
 
-        print(f"🟡 Cache miss — storing '{request.location}'")
-        count = store_pois(request.poi_data, request.location)
+        print(f" Cache miss — storing '{namespace}'")
+        count = store_pois(request.poi_data, namespace,request.location)
 
         return {
             "status":         "ready",
@@ -114,8 +93,8 @@ async def analyze(request: AnalyzeRequest):
             "cached":         False
         }
 
-    except Exception as e:
-        print(f"🔴 /analyze error: {type(e).__name__}: {e}")
+    except Exception as e:  
+        print(f" /analyze error: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse(
@@ -127,21 +106,13 @@ async def analyze(request: AnalyzeRequest):
         )
 
 
-# ────────────────────────────────────────────────────
-# CHAT
-# ────────────────────────────────────────────────────
-
 @router.post("/chat")
 async def chat(request: ChatRequest,
                x_session_id: str = Header(default=None)):
-    """
-    Requires X-Session-Id header from /analyze.
-    Returns response + top 3 suggestions list.
-    """
     if not request.message.strip():
         return {
             "response":    "Please enter a question.",
-            "suggestions": None    # ✅ changed from suggestion
+            "suggestions": None
         }
 
     if not x_session_id:
@@ -149,7 +120,7 @@ async def chat(request: ChatRequest,
             status_code = 400,
             content     = {
                 "response":    "Missing X-Session-Id header. Call /analyze first.",
-                "suggestions": None    # ✅ changed from suggestion
+                "suggestions": None
             }
         )
 
@@ -159,36 +130,39 @@ async def chat(request: ChatRequest,
             status_code = 404,
             content     = {
                 "response":    "Session not found or expired. Please call /analyze again.",
-                "suggestions": None    # ✅ changed from suggestion
+                "suggestions": None
             }
         )
 
     try:
-        result = ask_agent(request.message, session)
-
-        # ✅ Log suggestions for debugging
+        result      = ask_agent(request.message, session)
         suggestions = result.get("suggestions")
-        print(f"🔍 DEBUG suggestions count: "
-              f"{len(suggestions) if suggestions else 0}")
+
+        print(f" suggestions count: {len(suggestions) if suggestions else 0}")
         if suggestions:
             for s in suggestions:
-                print(f"   Rank {s['rank']}: "
-                      f"{s['lat']:.4f}, {s['lon']:.4f} "
-                      f"— {s['label']}")
+                print(f"   Rank {s['rank']}: {s['lat']:.4f}, {s['lon']:.4f} — {s['label']}")
 
         return {
             "response":    result["response"],
-            "suggestions": suggestions    # ✅ list of 3, not single dict
+            "suggestions": suggestions
         }
 
     except Exception as e:
-        print(f"🔴 /chat error: {type(e).__name__}: {e}")
+        print(f" /chat error: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse(
             status_code = 500,
             content     = {
                 "response":    f"Something went wrong: {type(e).__name__}. Please try again.",
-                "suggestions": None    # ✅ changed from suggestion
+                "suggestions": None
             }
         )
+
+
+
+
+
+
+
