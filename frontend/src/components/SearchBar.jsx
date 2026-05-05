@@ -4,6 +4,7 @@ import boundary from '../assets/Delhi_bnd.geojson?raw'
 
 export default function SearchBar({
     onSearch,
+    onClearSearch,
     onAnalyze,
     onOpenContextualPanel,
     locationFound,
@@ -34,8 +35,8 @@ export default function SearchBar({
 
     async function handleSearch() {
         if (!query.trim()) return
-        await onSearch(query.trim(), radius)
-        setIsSearchExecuted(true)
+        const isFound = await onSearch(query.trim(), radius)
+        setIsSearchExecuted(Boolean(isFound))
     }
 
     function handleQueryChange(event) {
@@ -46,6 +47,7 @@ export default function SearchBar({
     function handleClearSearch() {
         setQuery('')
         setIsSearchExecuted(false)
+        onClearSearch?.()
     }
     const percentage = (radiusIndex / (radiusOptions.length - 1)) * 100;
     return (

@@ -126,7 +126,7 @@ export default function App() {
 
       if (!isInside) {
         setStatus('Location is outside allowed boundary ')
-        return
+        return false
       }
 
       // If inside → proceed normally
@@ -144,9 +144,29 @@ export default function App() {
       setSelectedCategories([])
 
       setStatus(`Found: ${data.place_name} Inside boundary`)
+      return true
     } catch (err) {
       setStatus('Location not found')
+      return false
     }
+  }
+
+  function handleClearSearch() {
+    setLat(null)
+    setLon(null)
+    setLocationName('')
+    setPoiData(null)
+    setSummary({})
+    setIsAnalyzed(false)
+    setSuggestions([])
+    setSessionId(null)
+    setMessages([])
+    setShowChat(false)
+    setContextualMode('panel')
+    setSelectedCategories([])
+    setGridData([])
+    setShowGrid(false)
+    setStatus('Ready')
   }
 
   async function handleAnalyze() {
@@ -328,6 +348,7 @@ export default function App() {
           isAnalyzing={isAnalyzing}
           isAnalyzed={isAnalyzed}
           onSearch={handleSearch}
+          onClearSearch={handleClearSearch}
           onAnalyze={handleAnalyze}
           onDownload={handleDownload}
           setIsAnalyzing={setIsAnalyzing}

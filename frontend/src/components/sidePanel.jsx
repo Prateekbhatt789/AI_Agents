@@ -19,6 +19,7 @@ export default function SidePanel({ lat,
     isAnalyzing,
     isAnalyzed,
     onSearch,
+    onClearSearch,
     onAnalyze,
     onDownload,
     setIsAnalyzing,
@@ -45,6 +46,7 @@ export default function SidePanel({ lat,
         >
             <SearchBar
                 onSearch={onSearch}
+                onClearSearch={onClearSearch}
                 onAnalyze={onAnalyze}
                 onOpenContextualPanel={openContextualPanel}
                 locationFound={!!lat}
