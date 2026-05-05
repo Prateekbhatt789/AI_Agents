@@ -634,6 +634,14 @@ export default function MapViewer({
                                 <small style={{ color: '#64748b' }}>
                                     {normalizedCategory.replace(/_/g, ' ').toUpperCase()}
                                 </small>
+                                {item.sub_category && (
+                                    <>
+                                        <br />
+                                        <small style={{ color: '#0f766e', fontWeight: 600 }}>
+                                            Sub-category: {item.sub_category}
+                                        </small>
+                                    </>
+                                )}
                             </Popup>
                         </Marker>
                     )
