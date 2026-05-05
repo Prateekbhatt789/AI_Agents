@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { SearchIcon, SparklesIcon, TargetIcon } from './Icons'
+import { CrossIcon, SearchIcon, SparklesIcon, TargetIcon } from './Icons'
 import boundary from '../assets/Delhi_bnd.geojson?raw'
 
 export default function SearchBar({
@@ -15,6 +15,7 @@ export default function SearchBar({
 }) {
 
     const [query, setQuery] = useState('')
+    const [isSearchExecuted, setIsSearchExecuted] = useState(false)
     const [radius, setRadius] = useState(1)
     const radiusOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     const [radiusIndex, setRadiusIndex] = useState(0)
@@ -31,9 +32,20 @@ export default function SearchBar({
         setRadiusKm(newRadius)
     }, [radiusIndex])
 
-    function handleSearch() {
+    async function handleSearch() {
         if (!query.trim()) return
-        onSearch(query.trim(), radius)
+        await onSearch(query.trim(), radius)
+        setIsSearchExecuted(true)
+    }
+
+    function handleQueryChange(event) {
+        setQuery(event.target.value)
+        setIsSearchExecuted(false)
+    }
+
+    function handleClearSearch() {
+        setQuery('')
+        setIsSearchExecuted(false)
     }
     const percentage = (radiusIndex / (radiusOptions.length - 1)) * 100;
     return (
@@ -84,16 +96,21 @@ export default function SearchBar({
                 <input
                     type="text"
                     value={query}
-                    onChange={e => setQuery(e.target.value)}
+                    onChange={handleQueryChange}
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
                     placeholder="Search location or click on map..."
                     className="flex-1 bg-transparent px-2 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
                 />
                 <button
                     className="cursor-pointer"
-                    onClick={handleSearch}
+                    onClick={isSearchExecuted ? handleClearSearch : handleSearch}
+                    aria-label={isSearchExecuted ? 'Clear search' : 'Search location'}
                 >
-                    <SearchIcon className="h-7 w-7 mr-1" />
+                    {isSearchExecuted ? (
+                        <CrossIcon className="h-7 w-7 mr-1" />
+                    ) : (
+                        <SearchIcon className="h-7 w-7 mr-1" />
+                    )}
                 </button>
             </div>
 

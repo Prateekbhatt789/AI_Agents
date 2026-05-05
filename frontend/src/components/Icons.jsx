@@ -28,6 +28,15 @@ export function SearchIcon(props) {
   )
 }
 
+export function CrossIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M6 6l12 12" />
+      <path d="M18 6L6 18" />
+    </Icon>
+  )
+}
+
 export function TargetIcon(props) {
   return (
     <Icon {...props}>
