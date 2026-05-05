@@ -65,7 +65,7 @@ export default function SidePanel({ lat,
                         onDownload={onDownload}
                         onItemClick={() => openContextualPanel?.('panel')}
                         onSelectionChange={setSelectedCategories}
-                        selectedCategories={selectedCategories}
+                        
                     />
 
                     {/* {poiData?.pois && (

@@ -14,8 +14,9 @@ import {
 import { useState, useEffect } from 'react';
 import { fetchDashboardCategories,fetchCategoriesCount } from '../services/api';
 
-export default function Dashboard({ locationName, summary, lat, lon, radiusKm, onDownload, onItemClick, onSelectionChange, selectedCategories = [] }) {
+export default function Dashboard({ locationName, summary, lat, lon, radiusKm, onDownload, onItemClick, onSelectionChange }) {
     const [categories, setCategories] = useState([]);
+    const [selectedCategories, setSelectedCategories] = useState([]);
 
     useEffect(() => {
         let mounted = true;
@@ -70,6 +71,7 @@ export default function Dashboard({ locationName, summary, lat, lon, radiusKm, o
             ? selectedCategories.filter((k) => k !== key)
             : [...selectedCategories, key];
 
+        setSelectedCategories(nextSelectedCategories);
         onSelectionChange?.(nextSelectedCategories);
         onItemClick?.(nextSelectedCategories);
     };
