@@ -176,7 +176,7 @@ export default function App() {
       setSuggestions([])
       openContextualPanel('chat')
       setStatus(`Done`)
-      addMessage('ai', `Analysis complete for ${locationName}. Spatial grid ready. Ask me anything.`)
+      addMessage('ai', `Analysis complete for ${locationName}.  Ask me anything.`)
 
     } catch (err) {
       setStatus('Failed')

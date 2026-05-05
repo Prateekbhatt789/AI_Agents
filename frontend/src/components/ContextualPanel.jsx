@@ -90,104 +90,6 @@ const ContextualPanel = ({
   if (!showChat) return null
 
   return (
-    // <div className="relative flex h-full w-full">
-    //   <div className="relative flex h-full w-full flex-col border-l border-white bg-[#bcd9d7] p-2 backdrop-blur-md">
-    //     <button
-    //       onClick={() => setShowChat(false)}
-    //       className="absolute -left-8 top-1/2 -translate-y-1/2 z-50 bg-[#bcd9d7] border border-white rounded-l-md px-2 py-3 shadow-md hover:bg-[#a8c9c7] transition-all"
-    //       aria-label="Close contextual panel"
-    //     >
-    //       {'>'}
-    //     </button>
-
-    //     <button
-    //       onClick={() => setMode(mode === 'chat' ? 'panel' : 'chat')}
-    //       className="absolute top-2 right-2 z-50 bg-black backdrop-blur-sm border border-gray-300 rounded-full p-1 shadow-md hover:scale-110 transition-all duration-200 flex items-center justify-center"
-    //     >
-    //       <img
-    //         src={mode === 'chat' ? '/bar-chart.png' : '/message.png'}
-    //         alt="toggle-mode"
-    //         className="h-6 w-6 object-contain"
-    //       />
-    //     </button>
-
-    //     {mode === 'chat' ? (
-    //       <div className="min-h-0 flex-1 overflow-y-auto pt-12">
-    //         <ChatPanel
-    //           messages={messages}
-    //           onSend={handleChat}
-    //           isThinking={isThinking}
-    //           isReady={isAnalyzed}
-    //         />
-    //       </div>
-    //     ) : null}
-
-    //     {mode === 'panel' && (
-    //       <div className="min-h-0 flex-1 overflow-y-auto">
-    //         <div className="mb-3 border-t border-white/30 pt-4">
-    //           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
-    //             Category Details
-    //           </p>
-    //           {/* <p className="mt-1 text-sm text-slate-800">
-    //             {selectedCategories.length ? selectedCategories.join(', ') : 'No categories selected'}
-    //           </p> */}
-    //         </div>
-
-    //         <div className="flex flex-col gap-3 pb-4">
-    //           {isLoadingSubcategories && (
-    //             <div className="rounded-lg bg-white/40 p-3 text-sm text-slate-700">
-    //               Loading subcategories...
-    //             </div>
-    //           )}
-
-    //           {!isLoadingSubcategories && subcategoryError && (
-    //             <div className="rounded-lg bg-red-50/80 p-3 text-sm text-red-700">
-    //               {subcategoryError}
-    //             </div>
-    //           )}
-
-    //           {!isLoadingSubcategories && !subcategoryError && !selectedCategories.length && (
-    //             <div className="rounded-lg bg-white/40 p-3 text-sm text-slate-700">
-    //               Select one or more dashboard categories to view subcategory counts.
-    //             </div>
-    //           )}
-
-    //           {!isLoadingSubcategories && !subcategoryError && selectedCategories.length > 0 && (
-    //             selectedCategories.map((categoryKey) => {
-    //               const items = Array.isArray(subcategoryData?.[categoryKey]) ? subcategoryData[categoryKey] : []
-
-    //               return (
-    //                 <div key={categoryKey} className="rounded-xl bg-white/50 p-3 shadow-sm">
-    //                   <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-800">
-    //                     {categoryKey}
-    //                   </h3>
-
-    //                   {items.length ? (
-    //                     <div className="mt-2 flex flex-col gap-2">
-    //                       {items.map((item) => (
-    //                         <div
-    //                           key={`${categoryKey}-${item.key}`}
-    //                           className="flex items-center justify-between rounded-lg bg-white/70 px-3 py-2 text-sm text-slate-700"
-    //                         >
-    //                           <span>{item.key}</span>
-    //                           <span className="font-semibold text-slate-900">{item.value}</span>
-    //                         </div>
-    //                       ))}
-    //                     </div>
-    //                   ) : (
-    //                     <p className="mt-2 text-sm text-slate-600">
-    //                       No subcategories found.
-    //                     </p>
-    //                   )}
-    //                 </div>
-    //               )
-    //             })
-    //           )}
-    //         </div>
-    //       </div>
-    //     )}
-    //   </div>
-    // </div>
     <div className="relative flex h-full w-full">
       <div className="relative flex h-full w-full flex-col 
     border-l border-white/30 
@@ -197,6 +99,7 @@ const ContextualPanel = ({
         {/* Toggle Mode Button */}
         <button
           onClick={() => onModeChange?.(mode === 'chat' ? 'panel' : 'chat')}
+          title={mode === 'chat' ? 'Switch to Panel View' : 'Chat With Jarvis'}
           className="absolute top-3 right-3 z-50 
       bg-white/60 backdrop-blur-md 
       border border-white/40 
@@ -238,7 +141,7 @@ const ContextualPanel = ({
 
               {/* Loading */}
               {isLoadingSubcategories && (
-                <div className="rounded-xl bg-white/60 p-3 text-sm text-slate-700 shadow-sm animate-pulse">
+                <div className="rounded-xl bg-white/60 p-3 text-st text-slate-700 shadow-sm animate-pulse">
                   Loading subcategories...
                 </div>
               )}

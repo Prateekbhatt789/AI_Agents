@@ -58,9 +58,9 @@ def get_embedder():
     with _model_lock:
         if _embedder is None:
             from sentence_transformers import SentenceTransformer
-            print("🟡 Loading sentence-transformers model...")
+            print("Loading sentence-transformers model...")
             _embedder = SentenceTransformer("all-MiniLM-L6-v2")
-            print("✅ sentence-transformers model ready")
+            print("sentence-transformers model ready")
     return _embedder
 
 
@@ -83,19 +83,19 @@ def ensure_index():
             pc       = _get_pc()
             existing = [i.name for i in pc.list_indexes().indexes]
             if INDEX_NAME not in existing:
-                print(f"🟡 Creating Pinecone index '{INDEX_NAME}'")
+                print(f"Creating Pinecone index '{INDEX_NAME}'")
                 pc.create_index(
                     name      = INDEX_NAME,
                     dimension = 384,
                     metric    = "cosine",
                     spec      = ServerlessSpec(cloud="aws", region="us-east-1")
                 )
-                print(f"✅ Index '{INDEX_NAME}' created")
+                print(f" Index '{INDEX_NAME}' created")
             else:
-                print(f"✅ Index '{INDEX_NAME}' ready")
+                print(f" Index '{INDEX_NAME}' ready")
             _index_ready = True
         except Exception as e:
-            print(f"🔴 ensure_index failed: {e}")
+            print(f" ensure_index failed: {e}")
             raise
 
 
@@ -103,16 +103,32 @@ def ensure_index():
 # NAMESPACE HELPERS
 # ────────────────────────────────────────────────────
 
-def make_namespace(location_name: str) -> str:
-    """
-    Converts location name to a safe Pinecone namespace.
-    Example: "Éamon de Valera Marg" → "eamon_de_valera_marg"
-    """
+# def make_namespace(location_name: str) -> str:
+#     """
+#     Converts location name to a safe Pinecone namespace.
+#     Example: "Éamon de Valera Marg" → "eamon_de_valera_marg"
+#     """
+#     clean = unicodedata.normalize("NFKD", location_name)
+#     clean = clean.encode("ascii", "ignore").decode("ascii")
+#     clean = clean.lower().replace(" ", "_")
+#     clean = re.sub(r"[^a-z0-9_-]", "", clean)
+#     return clean[:40]
+
+
+def make_namespace(location_name: str, radius_km: float = None) -> str:
     clean = unicodedata.normalize("NFKD", location_name)
     clean = clean.encode("ascii", "ignore").decode("ascii")
     clean = clean.lower().replace(" ", "_")
     clean = re.sub(r"[^a-z0-9_-]", "", clean)
-    return clean[:40]
+    clean = clean[:50]
+    if radius_km is not None:
+        radius_str = str(int(radius_km)) if radius_km.is_integer() else str(radius_km)
+        radius_str = radius_str.replace('.', '_')
+        clean = f"{clean}_{str(radius_km).replace('.', '_')}"
+    return clean
+
+
+
 
 
 def namespace_exists(namespace: str) -> bool:
@@ -126,7 +142,7 @@ def namespace_exists(namespace: str) -> bool:
         stats = index.describe_index_stats()
         return namespace in (stats.namespaces or {})
     except Exception as e:
-        print(f"🔴 namespace_exists failed: {e}")
+        print(f"namespace_exists failed: {e}")
         return False
 
 
@@ -142,15 +158,13 @@ def make_vector_id(text: str, namespace: str, index: int) -> str:
 # ────────────────────────────────────────────────────
 # STORE POIS
 # ────────────────────────────────────────────────────
-def store_pois(poi_data: dict, location_name: str) -> int:
+def store_pois(poi_data: dict, namespace: str, location_name: str) -> int:
     ensure_index()
 
-    namespace = make_namespace(location_name)
-    index     = _get_pc().Index(INDEX_NAME)
-    texts     = []
-    metas     = []
+    index = _get_pc().Index(INDEX_NAME)
+    texts = []
+    metas = []
 
-    # ✅ FIX: only use "pois"
     pois = poi_data.get("pois", {})
 
     for category, items in pois.items():
@@ -158,8 +172,6 @@ def store_pois(poi_data: dict, location_name: str) -> int:
             continue
 
         for item in items[:30]:
-
-            # ✅ SAFE access (no crash)
             name = item.get("name", "Unknown")
             lat  = item.get("lat")
             lon  = item.get("lon")
@@ -213,14 +225,14 @@ def store_pois(poi_data: dict, location_name: str) -> int:
                 success = True
                 break
             except Exception as e:
-                print(f"🔴 Upsert batch {batch_start} failed "
+                print(f" Upsert batch {batch_start} failed "
                       f"(attempt {attempt+1}/3): {e}")
                 time.sleep(2 * (attempt + 1))
 
-        if not success:
-            print(f"🔴 Batch {batch_start} permanently failed — skipping")
 
     return len(vectors)
+
+
 # ────────────────────────────────────────────────────
 # SEARCH
 # ────────────────────────────────────────────────────
@@ -239,7 +251,7 @@ def search_pois(query: str, namespace: str, top_k: int = 8) -> list:
             namespace        = namespace
         )
     except Exception as e:
-        print(f"🔴 search_pois failed: {e}")
+        print(f"search_pois failed: {e}")
         return []
 
     return [

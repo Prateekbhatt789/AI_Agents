@@ -599,7 +599,7 @@ export default function MapViewer({
                         >
                             <Popup>
                                 <strong>Grid {cell.grid_id}</strong><br />
-                                Score: {cell.score}<br />
+                                Score: {cell.normalized_score}<br />
                                 Population: {cell.population}
                             </Popup>
                         </Polygon>

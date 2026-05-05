@@ -8,6 +8,8 @@ import {
     SendIcon
 } from './Icons'
 
+// import { formatMessage } from '../formatting'
+
 const QUICK_QUESTIONS = [
     { label: 'Human Hospitals', text: 'Is this a good location to open a Hospital for Human?', icon: HospitalIcon },
     { label: 'Transport', text: 'How is the public transport connectivity?', icon: BusIcon },
@@ -57,22 +59,25 @@ export default function ChatPanel({ messages, onSend, isThinking, isReady }) {
                     messages.map((msg, i) => (
                         <div
                             key={i}
-                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            className={`flex mt-1 mb-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                             <div
-                                className={`max-w-[85%] rounded-xl px-4 py-2.5 text-xs leading-relaxed ${msg.role === 'user'
+                                className={`max-w-[85%] rounded-xl px-4 py-3 text-xs leading-7 ${msg.role === 'user'
                                     ? 'bg-blue-600 text-white'
                                     : 'bg-slate-100 text-slate-900'
                                     }`}
                             >
-                                {msg.text}
+                                <div className="whitespace-pre-line">
+                                    {msg.text}
+                                </div>
+                                {/* <div>{msg.role === 'user' ? msg.text : formatMessage(msg.text)}</div> */}
                             </div>
                         </div>
                     ))
                 )}
 
                 {isThinking && (
-                    <div className="flex justify-start">
+                    <div className="flex mb-3 justify-start">
                         <div className="bg-slate-100 text-slate-600 rounded-xl px-4 py-2.5 text-xs">
                             <div className="flex items-center gap-2">
                                 <div className="flex gap-1">
