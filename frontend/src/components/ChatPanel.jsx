@@ -27,7 +27,7 @@ export default function ChatPanel({ messages, onSend, isThinking, isReady }) {
     }, [messages, isThinking])
 
     function handleSend() {
-        if (!input.trim() || !isReady) return
+        if (!input.trim() || !isReady || isThinking) return
         onSend(input.trim())
         setInput('')
     }
@@ -85,7 +85,7 @@ export default function ChatPanel({ messages, onSend, isThinking, isReady }) {
                                     <span className="inline-block w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                                     <span className="inline-block w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                                 </div>
-                                Analyzing...
+                                Searching ...
                             </div>
                         </div>
                     </div>
@@ -99,8 +99,8 @@ export default function ChatPanel({ messages, onSend, isThinking, isReady }) {
                     {QUICK_QUESTIONS.map(({ label, text, icon: Icon }) => (
                         <button
                             key={label}
-                            onClick={() => isReady && onSend(text)}
-                            disabled={!isReady}
+                            onClick={() => isReady && !isThinking && onSend(text)}
+                            disabled={!isReady || isThinking}
                             className="flex items-center gap-1.5 rounded-lg border border-slate-200 hover:border-blue-300 bg-slate-50 hover:bg-blue-50 px-3 py-2 text-xs text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             <Icon className="h-3.5 w-3.5 flex-shrink-0" />
@@ -118,12 +118,12 @@ export default function ChatPanel({ messages, onSend, isThinking, isReady }) {
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
                     placeholder={isReady ? 'Ask about a location...' : 'Loading...'}
-                    disabled={!isReady}
+                    disabled={!isReady || isThinking}
                     className="flex-1 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 bg-white px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 outline-none transition-all disabled:opacity-60 disabled:bg-slate-50"
                 />
                 <button
                     onClick={handleSend}
-                    disabled={!isReady || !input.trim()}
+                    disabled={!isReady || isThinking || !input.trim()}
                     className="flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-xs font-500 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
                 >
                     <SendIcon className="h-4 w-4" />

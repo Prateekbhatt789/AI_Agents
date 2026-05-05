@@ -10,6 +10,7 @@ const ContextualPanel = ({
   selectedCategories = [],
   messages = [],
   onSend,
+  isChatSearching = false,
   isReady = false,
   poiData = null,
 }) => {
@@ -120,7 +121,7 @@ const ContextualPanel = ({
             <ChatPanel
               messages={messages}
               onSend={onSend}
-              isThinking={false}
+              isThinking={isChatSearching}
               isReady={isReady}
             />
           </div>

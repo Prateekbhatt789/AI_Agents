@@ -94,6 +94,7 @@ export default function App() {
   const [locationName, setLocationName] = useState('')
   const [summary, setSummary] = useState({})
   const [messages, setMessages] = useState([])
+  const [isChatSearching, setIsChatSearching] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [sessionId, setSessionId] = useState(null)
   const [showAdmin, setShowAdmin] = useState(false)
@@ -228,7 +229,10 @@ export default function App() {
   }
 
   async function handleContextualChat(message) {
+    if (isChatSearching) return
+
     addMessage('user', message)
+    setIsChatSearching(true)
 
     try {
       const response = await chatWithAgent(message, sessionId)
@@ -237,6 +241,8 @@ export default function App() {
     } catch (error) {
       console.error(error)
       addMessage('ai', error.message || 'Error. Please try again.')
+    } finally {
+      setIsChatSearching(false)
     }
   }
 
@@ -382,6 +388,7 @@ export default function App() {
               selectedCategories={selectedCategories}
               messages={messages}
               onSend={handleContextualChat}
+              isChatSearching={isChatSearching}
               isReady={isAnalyzed}
               poiData={poiData}
             />
