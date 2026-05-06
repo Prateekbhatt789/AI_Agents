@@ -13,6 +13,8 @@ const ContextualPanel = ({
   isChatSearching = false,
   isReady = false,
   poiData = null,
+  selectedSubcategories = {},
+  setSelectedSubcategories,
 }) => {
   const [subcategoryData, setSubcategoryData] = useState({})
   const [isLoadingSubcategories, setIsLoadingSubcategories] = useState(false)
@@ -87,6 +89,32 @@ const ContextualPanel = ({
       isCancelled = true
     }
   }, [mode, selectedCategories, poiData])
+
+  function toggleSubcategory(categoryKey, subcategoryKey) {
+    setSelectedSubcategories?.((previousSelections) => {
+      const currentSelection = previousSelections[categoryKey] || []
+      const nextCategorySelection = currentSelection.includes(subcategoryKey)
+        ? currentSelection.filter((key) => key !== subcategoryKey)
+        : [...currentSelection, subcategoryKey]
+      const nextSelections = { ...previousSelections }
+
+      if (nextCategorySelection.length > 0) {
+        nextSelections[categoryKey] = nextCategorySelection
+      } else {
+        delete nextSelections[categoryKey]
+      }
+
+      return nextSelections
+    })
+  }
+
+  function clearSubcategorySelection(categoryKey) {
+    setSelectedSubcategories?.((previousSelections) => {
+      const nextSelections = { ...previousSelections }
+      delete nextSelections[categoryKey]
+      return nextSelections
+    })
+  }
 
   if (!showChat) return null
 
@@ -167,6 +195,7 @@ const ContextualPanel = ({
                   const items = Array.isArray(subcategoryData?.[categoryKey])
                     ? subcategoryData[categoryKey]
                     : []
+                  const selectedItems = selectedSubcategories[categoryKey] || []
 
                   return (
                     <div
@@ -174,27 +203,44 @@ const ContextualPanel = ({
                       className="rounded-2xl bg-white/60 backdrop-blur-md 
                   p-4 shadow-md border border-white/40"
                     >
-                      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-800">
-                        {categoryKey}
-                      </h3>
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="truncate text-sm font-semibold uppercase tracking-wide text-slate-800">
+                          {categoryKey}
+                        </h3>
+                        {selectedItems.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => clearSubcategorySelection(categoryKey)}
+                            className="shrink-0 rounded-full border border-slate-200 bg-white/80 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-cyan-400 hover:text-cyan-700"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
 
                       {items.length ? (
                         <div className="mt-3 flex flex-col gap-2">
-                          {items.map((item) => (
-                            <div
-                              key={`${categoryKey}-${item.key}`}
-                              className="flex items-center justify-between 
-                          rounded-lg bg-white/80 px-3 py-2 
-                          text-sm text-slate-700 
-                          shadow-sm hover:shadow-md 
-                          transition-all"
-                            >
-                              <span className="truncate">{item.key}</span>
-                              <span className="font-semibold text-slate-900">
-                                {item.value}
-                              </span>
-                            </div>
-                          ))}
+                          {items.map((item) => {
+                            const isSelected = selectedItems.includes(item.key)
+
+                            return (
+                              <button
+                                key={`${categoryKey}-${item.key}`}
+                                type="button"
+                                onClick={() => toggleSubcategory(categoryKey, item.key)}
+                                className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm shadow-sm transition-all hover:shadow-md
+                                  ${isSelected
+                                    ? 'border-cyan-500 bg-cyan-600 text-white'
+                                    : 'border-white/70 bg-white/80 text-slate-700 hover:border-cyan-300'
+                                  }`}
+                              >
+                                <span className="min-w-0 truncate">{item.key}</span>
+                                <span className={`ml-3 shrink-0 font-semibold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                                  {item.value}
+                                </span>
+                              </button>
+                            )
+                          })}
                         </div>
                       ) : (
                         <p className="mt-2 text-sm text-slate-600">

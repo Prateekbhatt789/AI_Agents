@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import MapViewer from './components/MapViewer'
 import SidePanel from './components/sidePanel'
 import { GlobeIcon, LoaderIcon } from './components/Icons'
@@ -101,6 +101,7 @@ export default function App() {
   const [showChat, setShowChat] = useState(false)
   const [contextualMode, setContextualMode] = useState('panel')
   const [selectedCategories, setSelectedCategories] = useState([])
+  const [selectedSubcategories, setSelectedSubcategories] = useState({})
 
   // to show grid over map 
   const [gridData, setGridData] = useState([])
@@ -112,6 +113,26 @@ export default function App() {
     setContextualMode(mode)
     setShowChat(true)
   }
+
+  useEffect(() => {
+    const activeCategorySet = new Set(selectedCategories)
+
+    setSelectedSubcategories((previousSelections) => {
+      const nextSelections = {}
+
+      Object.entries(previousSelections).forEach(([categoryKey, subcategories]) => {
+        if (activeCategorySet.has(categoryKey) && subcategories.length > 0) {
+          nextSelections[categoryKey] = subcategories
+        }
+      })
+
+      if (Object.keys(nextSelections).length === Object.keys(previousSelections).length) {
+        return previousSelections
+      }
+
+      return nextSelections
+    })
+  }, [selectedCategories])
 
   async function handleSearch(query, radius) {
     setStatus('Searching...')
@@ -143,6 +164,7 @@ export default function App() {
       setShowChat(false)
       setContextualMode('panel')
       setSelectedCategories([])
+      setSelectedSubcategories({})
 
       setStatus(`Found: ${data.place_name} Inside boundary`)
       return true
@@ -165,6 +187,7 @@ export default function App() {
     setShowChat(false)
     setContextualMode('panel')
     setSelectedCategories([])
+    setSelectedSubcategories({})
     setGridData([])
     setShowGrid(false)
     setStatus('Ready')
@@ -180,6 +203,7 @@ export default function App() {
       setPoiData(pois)
       setSummary(pois.summary)
       setSelectedCategories(Object.keys(pois.pois || {}).map(normalizeKey))
+      setSelectedSubcategories({})
       // to show the grid layer over the map
       setGridData(pois.grids ?? [])   // ← add this
 
@@ -267,6 +291,7 @@ export default function App() {
       setShowChat(false)
       setContextualMode('panel')
       setSelectedCategories([])
+      setSelectedSubcategories({})
       setStatus(`Found: ${data.place_name}`)
     } catch (err) {
       setStatus('Could not get location name')
@@ -386,6 +411,8 @@ export default function App() {
               mode={contextualMode}
               onModeChange={setContextualMode}
               selectedCategories={selectedCategories}
+              selectedSubcategories={selectedSubcategories}
+              setSelectedSubcategories={setSelectedSubcategories}
               messages={messages}
               onSend={handleContextualChat}
               isChatSearching={isChatSearching}
@@ -467,6 +494,7 @@ export default function App() {
             showGrid={showGrid}
             selectedCategories={selectedCategories}
             setSelectedCategories={setSelectedCategories}
+            selectedSubcategories={selectedSubcategories}
           />
         </div>
 

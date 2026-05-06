@@ -414,6 +414,7 @@ export default function MapViewer({
     showGrid = false,
     selectedCategories = [],
     setSelectedCategories,
+    selectedSubcategories = {},
 }) {
     const [categoryIcons, setCategoryIcons] = useState({})
     const [categoryList, setCategoryList] = useState([])
@@ -465,6 +466,8 @@ export default function MapViewer({
             icon: categoryIcons[categoryKey]
         }))
     const showLegend = poiData?.pois && activePoiKeys.length > 0
+    const hasActiveSubcategorySelection = Object.values(selectedSubcategories)
+        .some((subcategories) => subcategories.length > 0)
 
     const resetLegendSelection = () => {
         if (!setSelectedCategories) return
@@ -615,12 +618,17 @@ export default function MapViewer({
                 const normalizedCategory = normalizeKey(category)
                 const isVisible = selectedCategories.includes(normalizedCategory)
                 if (!isVisible) return null
+                const activeSubcategories = selectedSubcategories[normalizedCategory] || []
+                if (hasActiveSubcategorySelection && activeSubcategories.length === 0) return null
 
                 const iconHtml = categoryIcons[normalizedCategory]
                 const icon = createCategoryIcon(category, iconHtml)
                 const style = CATEGORY_STYLES[normalizedCategory] || CATEGORY_STYLES[category] || { symbol: 'POI' }
+                const visibleItems = activeSubcategories.length > 0
+                    ? items.filter((item) => activeSubcategories.includes(item.sub_category || 'Unknown'))
+                    : items
 
-                return items.slice(0, 100).map((item, i) => {
+                return visibleItems.slice(0, 100).map((item, i) => {
                     if (!item.lat || !item.lon) return null
 
                     return (
