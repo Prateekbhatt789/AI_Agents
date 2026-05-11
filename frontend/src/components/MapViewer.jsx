@@ -278,6 +278,90 @@ const RANK_TITLES = {
     2: '2nd Best Location',
     3: '3rd Best Location',
 }
+
+function parseGeometry(value) {
+    if (!value) return null
+
+    if (typeof value === 'string') {
+        try {
+            return JSON.parse(value)
+        } catch {
+            return null
+        }
+    }
+
+    return value
+}
+
+function lineCoordinatesToPositions(coordinates) {
+    if (!Array.isArray(coordinates)) return []
+
+    return coordinates
+        .filter((point) => Array.isArray(point) && point.length >= 2)
+        .map(([lng, lat]) => [lat, lng])
+}
+
+function RoadLayer({ roadData = [] }) {
+    if (roadData?.type === 'FeatureCollection' || roadData?.type === 'Feature') {
+        return (
+            <GeoJSON
+                data={roadData}
+                style={{
+                    color: '#ef4444',
+                    weight: 2.2,
+                    opacity: 0.85,
+                }}
+            />
+        )
+    }
+
+    if (!Array.isArray(roadData)) return null
+
+    return roadData.map((road, index) => {
+        const geom = parseGeometry(road.geom || road.geometry || road)
+        const coordinates = geom?.type === 'Feature' ? geom.geometry?.coordinates : geom?.coordinates
+        const type = geom?.type === 'Feature' ? geom.geometry?.type : geom?.type
+
+        if (type === 'LineString') {
+            const positions = lineCoordinatesToPositions(coordinates)
+            if (!positions.length) return null
+
+            return (
+                <Polyline
+                    key={road.id || road.road_id || `road-${index}`}
+                    positions={positions}
+                    pathOptions={{
+                        color: '#ef4444',
+                        weight: 2.2,
+                        opacity: 0.85,
+                    }}
+                />
+            )
+        }
+
+        if (type === 'MultiLineString') {
+            const positions = coordinates
+                .map(lineCoordinatesToPositions)
+                .filter((line) => line.length > 0)
+            if (!positions.length) return null
+
+            return (
+                <Polyline
+                    key={road.id || road.road_id || `road-${index}`}
+                    positions={positions}
+                    pathOptions={{
+                        color: '#ef4444',
+                        weight: 2.2,
+                        opacity: 0.85,
+                    }}
+                />
+            )
+        }
+
+        return null
+    })
+}
+
 function ResizeMap({ trigger }) {
     const map = useMap();
 
@@ -412,6 +496,8 @@ export default function MapViewer({
     isAnalyzing, isAnalyzed, trigger,
     gridData = [],
     showGrid = false,
+    roadData = [],
+    showRoad = false,
     selectedCategories = [],
     setSelectedCategories,
     selectedSubcategories = {},
@@ -611,6 +697,8 @@ export default function MapViewer({
                     return null
                 }
             })}
+
+            {showRoad && <RoadLayer roadData={roadData} />}
 
             {poiData?.pois && Object.entries(poiData.pois).map(([category, items]) => {
                 if (!Array.isArray(items)) return null
