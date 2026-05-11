@@ -3,6 +3,53 @@ import math
 
 DB_SCHEMA = os.getenv("DB_SCHEMA", "data")
 
+
+# ─────────────────────────────────────────────────────────────────
+# SUBCATEGORY RULES  (override broad FACILITY_RULES when keyword matched)
+# ─────────────────────────────────────────────────────────────────
+SUBCATEGORY_RULES = {
+
+    "petrol pump": {
+        "poi_table":   "infra_str",
+        "poi_filter":  ["petrol pump", "gas station", "cng station"],
+        "needs":       ["transport", "business","food"],
+        "avoid":       [],
+        "min_pop":     100,
+        "min_dist_km": 1,
+        "weight":      1.2,
+    },
+
+    "gas station": {
+        "poi_table":   "infra_str",
+        "poi_filter":  ["gas station", "petrol pump", "cng station"],
+        "needs":       ["transport", "business"],
+        "avoid":       [],
+        "min_pop":     100,
+        "min_dist_km": 1.1,
+        "weight":      1.1,
+    },
+
+    "fire station": {
+        "poi_table":   "infra_str",
+        "poi_filter":  ["fire station"],
+        "needs":       ["transport","health_care"],
+        "avoid":       [],
+        "min_pop":     500,
+        "min_dist_km": 2.0,
+        "weight":      1.5,
+    },
+
+    "police station": {
+        "poi_table":   "infra_str",
+        "poi_filter":  ["police station", "pcr"],
+        "needs":       ["transport", "building"],
+        "avoid":       [],
+        "min_pop":     400,
+        "min_dist_km": 1.5,
+        "weight":      1.3,
+    },
+}
+
 # ─────────────────────────────────────────────────────────────────
 # FACILITY RULES
 # ─────────────────────────────────────────────────────────────────
@@ -15,7 +62,7 @@ FACILITY_RULES = {
         "min_dist_km": 2.0,
         "weight":      1.5,
     },
-    "schools": {
+    "education": {
         "poi_table":   "education",
         "needs":       ["transport", "recreation"],
         "avoid":       ["infra_str"],
@@ -169,8 +216,13 @@ def decay_sum(cell_lat:  float,
               index:     dict[tuple, list[dict]],
               radius_km: float = PROXIMITY_RADIUS_KM) -> float:
     candidates = query_spatial_index(index, cell_lat, cell_lon, radius_km)
-    total      = 0.0
+    seen  = set()
+    total = 0.0
     for p in candidates:
+        pid = (p.get("lat"), p.get("lon"), p.get("name", ""))
+        if pid in seen:
+            continue                    # ← skip duplicates
+        seen.add(pid)
         d = haversine(cell_lat, cell_lon, p["lat"], p["lon"])
         if d < radius_km:
             total += 1.0 / (d + 0.1)
@@ -219,16 +271,25 @@ def percentile_score(value: float,
 # ─────────────────────────────────────────────────────────────────
 # BUILD DECAY CACHE FOR ONE CELL
 # ─────────────────────────────────────────────────────────────────
+
+
 def build_decay_cache(cell_lat:    float,
                       cell_lon:    float,
-                      poi_indexes: dict[str, dict]) -> dict[str, float]:
+                      poi_indexes: dict[str, dict],
+                      rules:       dict = None) -> dict[str, float]:    # ← ADD rules
     cache = {}
+
+    # Use rule's min_dist_km as the relevant search radius for competitor table
+    # For all other tables, use standard PROXIMITY_RADIUS_KM
+    comp_table  = rules.get("poi_table") if rules else None
+    comp_radius = rules.get("min_dist_km", PROXIMITY_RADIUS_KM) if rules else PROXIMITY_RADIUS_KM
+
     for table in ALL_POI_TABLES:
-       
+        radius = comp_radius if table == comp_table else PROXIMITY_RADIUS_KM
         cache[table] = decay_sum(
             cell_lat, cell_lon,
             poi_indexes.get(table, {}),
-            radius_km=PROXIMITY_RADIUS_KM,
+            radius_km=radius,
         )
     return cache
 
@@ -279,16 +340,14 @@ def normalize_scores(scored_grids: list[dict],
     result = []
     for g in scored_grids:
         g_copy = g.copy()
+        raw_score = g[score_key]
         if rng == 0:
-            # FIX 7: Single grid or all grids equal score
-            # OLD: returned 50.0 — misleading, implies middle of range
-            # NEW: if only 1 grid → 100.0 (it's the best by default)
-            #      if multiple grids all equal → 50.0 (genuinely tied)
             g_copy["normalized_score"] = 100.0 if len(scored_grids) == 1 else 50.0
         else:
             g_copy["normalized_score"] = round(
-                (g[score_key] - min_val) / rng * 100, 2
+                (raw_score - min_val) / rng * 100, 2
             )
+        g_copy["raw_score"] = raw_score   # ← keep raw score for debugging
         result.append(g_copy)
 
     return result
@@ -297,63 +356,63 @@ def normalize_scores(scored_grids: list[dict],
 # ─────────────────────────────────────────────────────────────────
 # SCORE ONE CELL FOR ONE CATEGORY  (percentile-relative)
 # ─────────────────────────────────────────────────────────────────
-def score_cell_for_category(cell:        dict,
-                             rules:       dict,
-                             poi_indexes: dict[str, dict],
-                             pop_max:     float,
-                             decay_cache: dict[str, float],
-                             area_pct:    dict[str, dict] = None) -> float:
+
+def score_cell_for_category(cell, rules, poi_indexes, pop_max,
+                             decay_cache, area_pct=None, poi_filter=None):
 
     lat = cell["center_lat"]
     lon = cell["center_lon"]
     pop = cell["population"]
-
     score = 0.0
 
-    # ── Factor 1: Competition ────────────────────────────────────
-    min_dist_km  = rules["min_dist_km"]
-    comp_penalty = 0.0
-    comp_index   = poi_indexes.get(rules["poi_table"], {})
-    comp_candidates = query_spatial_index(comp_index, lat, lon, min_dist_km * 2)
+    # ── Factor 1: Competition — nearest only ──────────────────────
+    min_dist_km   = rules["min_dist_km"]
+    area_radius   = cell.get("area_radius_km")
+    search_radius = min(min_dist_km, area_radius) if area_radius else min_dist_km
 
-    nearby = []
+    comp_index      = poi_indexes.get(rules["poi_table"], {})
+    comp_candidates = query_spatial_index(comp_index, lat, lon, search_radius)
+
+    if poi_filter:
+        comp_candidates = [
+            p for p in comp_candidates
+            if any(
+                f.lower() in (p.get("sub_category") or "").lower()
+                or f.lower() in (p.get("name") or "").lower()
+                for f in poi_filter
+            )
+        ]
+
+    nearest_dist = float("inf")
     for p in comp_candidates:
         d = haversine(lat, lon, p["lat"], p["lon"])
-        if d < min_dist_km * 0.5:
-            comp_penalty -= 4.0
-            nearby.append(p)
-        elif d < min_dist_km:
-            comp_penalty -= 2.0
-            nearby.append(p)
-        elif d < min_dist_km * 2:
-            comp_penalty -= 0.5
-            nearby.append(p)
+        if d < nearest_dist:
+            nearest_dist = d
 
-    if not nearby:
-        comp_penalty += 5.0
+    if nearest_dist == float("inf"):
+        comp_penalty = 3.0                        # no competition
+    elif nearest_dist < search_radius * 0.33:
+        comp_penalty = -8.0                       # danger zone
+    elif nearest_dist < search_radius * 0.66:
+        comp_penalty = -3.0                       # warning zone
+    else:
+        comp_penalty = -1.0                       # buffer zone
 
-    competitor_count = len(nearby)
-    dynamic_floor    = min(-4.0 * competitor_count, -20.0)
-    score           += max(comp_penalty, dynamic_floor)
+    score += comp_penalty
 
-    # ── Factor 2: Population ─────────────────────────────────────
-    
+    # ── Factor 2: Population ──────────────────────────────────────
     if pop < rules["min_pop"]:
         pop_score = 0.0
     else:
         pop_ratio = pop / pop_max if pop_max > 0 else 0.0
-        if pop_ratio >= 0.75:
-            pop_score = 4.0
-        elif pop_ratio >= 0.50:
-            pop_score = 3.0
-        elif pop_ratio >= 0.25:
-            pop_score = 2.0
-        else:
-            pop_score = 1.0
+        if pop_ratio >= 0.75:   pop_score = 4.0
+        elif pop_ratio >= 0.50: pop_score = 3.0
+        elif pop_ratio >= 0.25: pop_score = 2.0
+        else:                   pop_score = 1.0
 
     score += pop_score
 
-    # ── Factor 3: Required nearby facilities (percentile-relative) ─
+    # ── Factor 3: Needs ───────────────────────────────────────────
     for need_table in rules["needs"]:
         if area_pct and need_table in area_pct:
             pct = area_pct[need_table]
@@ -364,34 +423,43 @@ def score_cell_for_category(cell:        dict,
         else:
             score += min(decay_cache.get(need_table, 0.0), 3.0)
 
-    # ── Factor 4: Avoid penalty ──────────────────────────────────
+    # ── Factor 4: Avoid — nearest only, no stacking ───────────────
+    avoid_radius = min_dist_km
     for avoid_table in rules["avoid"]:
         candidates = query_spatial_index(
-            poi_indexes.get(avoid_table, {}), lat, lon, 1.0
+            poi_indexes.get(avoid_table, {}), lat, lon, avoid_radius
         )
+        nearest_avoid = float("inf")
         for poi in candidates:
             d = haversine(lat, lon, poi["lat"], poi["lon"])
-            if d < 1.0:
-                score -= 2.0
+            if d < nearest_avoid:
+                nearest_avoid = d
 
-    # ── Factor 5: Accessibility (percentile-relative) ────────────
+        if nearest_avoid < avoid_radius:
+            if nearest_avoid < avoid_radius * 0.33:
+                score -= 3.0
+            elif nearest_avoid < avoid_radius * 0.66:
+                score -= 1.5
+            else:
+                score -= 0.5
+
+    # ── Factor 5: Accessibility ───────────────────────────────────
     if area_pct:
         tp = area_pct.get("transport", {})
         score += percentile_score(
             decay_cache.get("transport", 0.0),
             tp.get("p25", 0), tp.get("p50", 0), tp.get("p75", 0)
         )
-
         ip = area_pct.get("infra_str", {})
         score += percentile_score(
             decay_cache.get("infra_str", 0.0),
             ip.get("p25", 0), ip.get("p50", 0), ip.get("p75", 0)
-        ) * 0.67
+        ) * 0.5
     else:
         score += min(decay_cache.get("transport", 0.0), 3.0)
         score += min(decay_cache.get("infra_str",  0.0), 2.0)
 
-    # ── Factor 6: Diversity / urbanisation 
+    # ── Factor 6: Diversity ───────────────────────────────────────
     diversity = 0.0
     for div_table in DIVERSITY_TABLES:
         if area_pct and div_table in area_pct:
@@ -402,62 +470,188 @@ def score_cell_for_category(cell:        dict,
             )
         else:
             diversity += min(decay_cache.get(div_table, 0.0), 1.0)
+    score += min(diversity, 2.0)
 
-    score += min(diversity, 3.0)
+    # ── Factor 7: Center proximity tiebreaker ─────────────────────
+    center_lat = cell.get("area_center_lat")
+    center_lon = cell.get("area_center_lon")
+    max_radius = cell.get("area_radius_km")
+    if center_lat and center_lon and max_radius:
+        dist_to_center  = haversine(lat, lon, center_lat, center_lon)
+        norm_dist       = min(dist_to_center / max_radius, 1.0)
+        proximity_score = 1.5 * (1 - norm_dist) - 1.0 * (norm_dist ** 2)
+        score          += proximity_score
 
     return score
 
 
+# def score_cell_for_category(cell:        dict,
+#                              rules:       dict,
+#                              poi_indexes: dict[str, dict],
+#                              pop_max:     float,
+#                              decay_cache: dict[str, float],
+#                              area_pct:    dict[str, dict] = None,
+#                              poi_filter:  list[str] = None) -> float:
+
+#     lat = cell["center_lat"]
+#     lon = cell["center_lon"]
+#     pop = cell["population"]
+
+#     score = 0.0
+
+#     # ── Factor 1: Competition ─────────────────────────────────────
+#     # Only penalize based on NEAREST competitor — not all competitors
+#     # Multiple competitors shouldn't stack infinitely
+#     min_dist_km   = rules["min_dist_km"]
+#     area_radius   = cell.get("area_radius_km")
+#     search_radius = min(min_dist_km, area_radius) if area_radius else min_dist_km
+
+#     comp_index      = poi_indexes.get(rules["poi_table"], {})
+#     comp_candidates = query_spatial_index(comp_index, lat, lon, search_radius)
+
+#     # Filter to same subcategory only
+#     if poi_filter:
+#         comp_candidates = [
+#             p for p in comp_candidates
+#             if any(
+#                 f.lower() in (p.get("sub_category") or "").lower()
+#                 or f.lower() in (p.get("name")        or "").lower()
+#                 for f in poi_filter
+#             )
+#         ]
+
+#     # Find nearest competitor only
+#     nearest_dist = float("inf")
+#     for p in comp_candidates:
+#         d = haversine(lat, lon, p["lat"], p["lon"])
+#         if d < nearest_dist:
+#             nearest_dist = d
+
+#     # Penalty based on nearest competitor distance
+#     if nearest_dist == float("inf"):
+#         # No competitor nearby — good location
+#         comp_penalty = 3.0
+#     elif nearest_dist < search_radius * 0.33:
+#         # Too close — strong penalty
+#         comp_penalty = -8.0
+#     elif nearest_dist < search_radius * 0.66:
+#         # Acceptable distance — mild penalty
+#         comp_penalty = -3.0
+#     else:
+#         # Far enough — very small penalty
+#         comp_penalty = -1.0
+
+#     score += comp_penalty
+
+#     # ── Factor 2: Population ─────────────────────────────────────
+#     if pop < rules["min_pop"]:
+#         pop_score = 0.0
+#     else:
+#         pop_ratio = pop / pop_max if pop_max > 0 else 0.0
+#         if pop_ratio >= 0.75:   pop_score = 4.0
+#         elif pop_ratio >= 0.50: pop_score = 3.0
+#         elif pop_ratio >= 0.25: pop_score = 2.0
+#         else:                   pop_score = 1.0
+
+#     score += pop_score
+
+#     # ── Factor 3: Needs ───────────────────────────────────────────
+#     for need_table in rules["needs"]:
+#         if area_pct and need_table in area_pct:
+#             pct = area_pct[need_table]
+#             score += percentile_score(
+#                 decay_cache.get(need_table, 0.0),
+#                 pct["p25"], pct["p50"], pct["p75"]
+#             )
+#         else:
+#             score += min(decay_cache.get(need_table, 0.0), 3.0)
+
+#     # ── Factor 4: Avoid penalty ───────────────────────────────────
+#     avoid_radius = min_dist_km
+#     for avoid_table in rules["avoid"]:
+#         candidates = query_spatial_index(
+#             poi_indexes.get(avoid_table, {}), lat, lon, avoid_radius
+#         )
+#         for poi in candidates:
+#             d = haversine(lat, lon, poi["lat"], poi["lon"])
+#             if d < avoid_radius:
+#                 score -= 1.5   # ← reduced, was 2.0 and was stacking
+
+#     # ── Factor 5: Accessibility ───────────────────────────────────
+#     if area_pct:
+#         tp = area_pct.get("transport", {})
+#         score += percentile_score(
+#             decay_cache.get("transport", 0.0),
+#             tp.get("p25", 0), tp.get("p50", 0), tp.get("p75", 0)
+#         )
+#         ip = area_pct.get("infra_str", {})
+#         score += percentile_score(
+#             decay_cache.get("infra_str", 0.0),
+#             ip.get("p25", 0), ip.get("p50", 0), ip.get("p75", 0)
+#         ) * 0.5                # ← reduced weight, was 0.67
+#     else:
+#         score += min(decay_cache.get("transport", 0.0), 3.0)
+#         score += min(decay_cache.get("infra_str",  0.0), 2.0)
+
+#     # ── Factor 6: Diversity ───────────────────────────────────────
+#     diversity = 0.0
+#     for div_table in DIVERSITY_TABLES:
+#         if area_pct and div_table in area_pct:
+#             dp = area_pct[div_table]
+#             diversity += percentile_score(
+#                 decay_cache.get(div_table, 0.0),
+#                 dp["p25"], dp["p50"], dp["p75"]
+#             )
+#         else:
+#             diversity += min(decay_cache.get(div_table, 0.0), 1.0)
+#     score += min(diversity, 2.0)    # ← capped at 2.0, was 3.0
+
+#     # ── Factor 7: Center proximity tiebreaker ─────────────────────
+#     center_lat = cell.get("area_center_lat")
+#     center_lon = cell.get("area_center_lon")
+#     max_radius = cell.get("area_radius_km")
+#     if center_lat and center_lon and max_radius:
+#         dist_to_center  = haversine(lat, lon, center_lat, center_lon)
+#         norm_dist       = min(dist_to_center / max_radius, 1.0)
+#         proximity_score = 1.5 * (1 - norm_dist) - 1.0 * (norm_dist ** 2)
+#         score          += proximity_score
+
+#     return score
+
 # ─────────────────────────────────────────────────────────────────
 # SCORE ALL GRIDS FOR ONE CATEGORY  (runtime — called from agent)
 # ─────────────────────────────────────────────────────────────────
-def score_grids_for_category(grids:       list[dict],
-                              poi_data:    dict[str, list[dict]],
-                              poi_indexes: dict[str, dict],
-                              category:    str) -> list[dict]:
-    """
-    Full pipeline:
-      1. Build decay cache per grid
-      2. Compute area percentiles once across all grids
-      3. Score each grid relative to those percentiles
-      4. Normalize scores 0 → 100
-    Returns grids with dynamic_score + normalized_score added.
-    """
+
+def score_grids_for_category(grids, poi_data, poi_indexes,
+                              category, poi_filter=None, rules=None):
     if not grids:
         return []
 
-    if category not in FACILITY_RULES:
-        # FIX 11: Log unknown category so caller knows why scores are 0
-        print(f"  Unknown category '{category}' — valid: {list(FACILITY_RULES.keys())}")
-        return []
-        # return [dict(g, dynamic_score=0, normalized_score=0) for g in grids]
+    if rules is None:
+        if category in SUBCATEGORY_RULES:
+            rules = SUBCATEGORY_RULES[category]
+        elif category in FACILITY_RULES:
+            rules = FACILITY_RULES[category]
+        else:
+            print(f"[RULE] Unknown category '{category}'")
+            return []
 
-    rules = FACILITY_RULES[category]
-
-    
     pop_max = max((g.get("population", 0) for g in grids), default=1)
     pop_max = pop_max if pop_max > 0 else 1
 
-    # Step 1: decay caches
+    # Step 1: decay caches — now rule-aware ──────────────────────
     decay_caches = [
-        build_decay_cache(g["center_lat"], g["center_lon"], poi_indexes)
+        build_decay_cache(g["center_lat"], g["center_lon"], poi_indexes, rules=rules)
         for g in grids
     ]
-    
-    
-#     decay_caches = [
-#   {"transport": 5, "shops": 2},
-#   {"transport": 10, "shops": 3},
-#   {"transport": 20, "shops": 6},
-#   {"transport": 30, "shops": 8},
-# ]
 
     # Step 2: area percentiles
     area_pct = compute_area_percentiles(decay_caches)
 
+    if poi_filter:
+        print(f"[FILTER] poi_filter={poi_filter} active for category='{category}'")
 
-
-    # Step 3: score — FIX 8 reflected here: removed poi_data from call
+    # Step 3: score
     scored = []
     for i, g in enumerate(grids):
         raw = score_cell_for_category(
@@ -467,11 +661,10 @@ def score_grids_for_category(grids:       list[dict],
             pop_max     = pop_max,
             decay_cache = decay_caches[i],
             area_pct    = area_pct,
+            poi_filter  = poi_filter,
         )
         scored.append(dict(g, dynamic_score=round(raw, 4)))
 
     # Step 4: normalize
-    scored = normalize_scores(scored, score_key="dynamic_score")
+    return normalize_scores(scored, score_key="dynamic_score")
 
-
-    return scored

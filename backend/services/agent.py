@@ -9,7 +9,7 @@ from services.grid_scorer import (
     score_grids_for_category,
     build_spatial_index,
     FACILITY_RULES,
-    ALL_POI_TABLES,
+    SUBCATEGORY_RULES,
   query_spatial_index
     
 )
@@ -17,19 +17,50 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ── Purpose → category keyword map ───────────────────
-PURPOSE_MAP = {
-    "hospital":   "hospitals",    "clinic":      "hospitals",
-    "school":     "schools",      "college":     "schools",
-    "pharmacy":   "hospitals",    "medicine":    "hospitals",
-    "restaurant": "restaurants",  "food":        "restaurants",
-   
+# ── ADD CATEGORY_SYNONYMS INSTEAD ──
+
+CATEGORY_SYNONYMS: dict[str, list[str]] = {
+    "hospitals":      ["Dispensary", "Nursing Home", "Diagnostic Centre", "Ambulance",
+                       "Clinic", "Poly Clinic", "24 Hours Chemist", "Veterinary Clinic","Hospital","Blood Bank"],
+    
+    "education":      ["University Study Centre", "institute", "college", "Vocational Institute",
+                       "Pre School","Hostel","Library","school","Computer Education","university"],
+    
+    "finance":        ["Financial Service","Insurance Service","atm", "bank"],
+    
+    "recreation":     ["park", "Cultural Centre", "Locality", "Residential Area", "Playground","Gymnasium", 
+                       "Banquet Hall", "Pool", "Club", "Lake", "Cinema Hall", "Sport Club", "Stadium","Water Park"],
+    
+    "restaurants":    ["Tea Stall", "Fast Food", "Bakery", "Bar", "Juice Bar",
+                       "Ice Cream Parlour", "Restaurant", "Soda Shop","Dairy"],
+    
+    "religious":      ["temple", "Gurdwara", "Mosque","Mausoleum","Religious Society", "Prayer Hall","Church"],
+    
+    "shops":          ["Jewellery Shop", "Vegetable Shop", "Ration Shop", "Courier", "Commercial Complex", "Gift Shop", "Music Shop", "Cyber Cafe",
+                       "Mobile Shop","Sport Shop","Chemist Shop","Photo Lab","Multiplex","Footwear Shop","Book Shop","Super Market","Tailor Shop","White Goods Shop","Apparel Shop","Business","Laundry",
+                       "Hyper Market","Shopping Centre","LPG Shop","Auto Dealer","Handloom Shop","Boutique","Showroom","Computer Shop","Wine Shop","Professional Service","Stationery Shop","Beauty Parlour","Confectionery Shop",
+                       "Local Shopping Centre","Furniture Shop"],
+    
+    "tourism":        ["Art Gallery", "Travel Service", "Statue", "Zoo", "Tourist Information",
+                       "Historical Place", "Guest House","Museum","Hotel"],
+    
+    "businesses":     ["Airlines Office", "industry", "Real Estate","Company"],
+    
+    "infrastructure": ["Bridge","CNG Station","Telegraph Office","petrol pump","Fire Station","Auditorium","Graveyard","Post Office","Flyover",
+                       "PTO","Gas Station","Government Office","Court","BTS Tower","Telephone Office","PCR","Overhead Water Tank","Crematorium",
+                       "Public Utility","Telephone Exchange","Jail","Parking Place","GPO","police station", ],
+    
+    "building":       ["IT Park", "Embassy", "Apartment", "Society", "Industrial Complex","Landmark",
+                       "Mall","Building","Bungalow","Organisation","Office"],
+    
+    "transport":       ["Road Junction","Rapid Metro Station","Bus Terminal","Taxi Stand","Airport","Bus Stand","Metro Station","Railway Station"
+                        "Railway Reservation"]
 }
 
 # ── Maps agent category names → grid_scorer FACILITY_RULES keys ──
 CATEGORY_TO_RULE = {
     "hospitals":   "hospitals",
-    "schools":     "schools",
+    "education":    "education",
     "restaurants": "restaurants",
     "businesses":  "businesses",
     "finance":     "finance",
@@ -38,7 +69,8 @@ CATEGORY_TO_RULE = {
     "tourism":     "tourism",
     "building":   "building",   
     "infrastructure": "infra_str",
-    "religious": "religious",   
+    "religious": "religious",  
+    "transport":"transport" 
     
 }
 
@@ -93,27 +125,6 @@ def _get_poi_counts(session: dict) -> str:
     )
 
 
-def _search_nearby(query: str, session: dict) -> str:
-    namespace = make_namespace(session.get("location", "default"),session.get("radius") )
-    results   = search_pois(query[:200], namespace=namespace)
-
-    if not results:
-        return "No relevant places found."
-
-    seen  = set()
-    lines = []
-
-    for r in results:
-        key = (r["name"], r["category"])
-        if key in seen:
-            continue
-        seen.add(key)
-        lines.append(f"- {r['category']}: {r['name']}")
-        if len(lines) >= 8:
-            break
-
-    return "\n".join(lines)
-
 
 def _get_suitability(session: dict) -> str:
     s     = session.get("summary", {})
@@ -126,36 +137,46 @@ def _get_suitability(session: dict) -> str:
 
     return "\n".join(f"• {n}" for n in notes) if notes else "Limited amenities"
 
-def _get_category_pois(category: str, session: dict) -> str:
-    """Extract actual POI names from session for a given category."""
+
+def _get_category_pois(category: str, session: dict, keyword: str = None) -> str:
     poi_data = session.get("poi_data", {})
     pois     = poi_data.get("pois", {})
 
-    # map agent category → poi_data key
     category_key_map = {
-        "hospitals":   "Health Care",
-        "schools":     "Education",
-        "restaurants": "Food",
-        "businesses":  "Business",
-        "finance":     "Finance",
-        "recreation":  "Recreation",
-        "shops":       "Shops",
-        "tourism":     "Tourism",
-        "religious":   "Religious",
+        "hospitals":      "Health Care",
+        "education":      "Education",
+        "restaurants":    "Food",
+        "businesses":     "Business",
+        "finance":        "Finance",
+        "recreation":     "Recreation",
+        "shops":          "Shops",
+        "tourism":        "Tourism",
+        "religious":      "Religious",
+        "infrastructure": "Infrastructure",
+        "building":       "Building",
     }
 
     key   = category_key_map.get(category)
     items = pois.get(key, []) if key else []
 
+    if keyword:
+        keyword = keyword.lower().strip()
+        items = [
+            p for p in items
+            if (p.get("sub_category") or "").lower().strip() == keyword
+        ]
+
+    print(f"Total POIs found: {len(items)}")
+
     if not items:
-        return f"No {category} found in this area."
+        return f"__NONE_FOUND__:{keyword or category}"
 
     lines = []
-    for p in items[:20]:  # limit to 20
+    for i, p in enumerate(items, 1):  # ✅ NO LIMIT
         name = p.get("name", "Unnamed")
         lat  = p.get("lat", "")
         lon  = p.get("lon", "")
-        lines.append(f"- {name} ({lat}, {lon})")
+        lines.append(f"{i}. {name} ({lat}, {lon})")
 
     return "\n".join(lines)
 
@@ -198,172 +219,280 @@ def _normalize_poi_keys(poi_data: dict) -> dict:
 # ────────────────────────────────────────────────────
 # population for suggested location
 # ───────────────────────────────────────────────────
-def calculate_catchment_population(suggested_lat:  float,
-                                   suggested_lon:  float,
-                                   all_grids:      list[dict],
-                                   poi_indexes:    dict,
-                                   poi_table:      str,
-                                   radius_km:      float,
-                                   other_selected: list[dict]) -> tuple[int, float]:
-    """
-    1. Finds nearest existing facility from poi_indexes
-    2. Finds nearest other suggested location
-    3. Uses MINIMUM of both as catchment radius
-    4. Sums population of all grids within that radius
-    """
 
-    # ── Step 1: nearest existing facility ────────────────────────
-    nearest_existing = None
-# poi_table = "health_care" (for hospitals)
-# poi_indexes = {
-#     "health_care": {(572, 1544): [Hospital_A, Hospital_B]},
-#     "education":   {(572, 1546): [School_A]},
-# }
-# comp_index = {(572, 1544): [Hospital_A, Hospital_B]}
+def calculate_catchment_population(
+    suggested_lat:  float,
+    suggested_lon:  float,
+    all_grids:      list[dict],
+    poi_indexes:    dict,
+    poi_table:      str,
+    radius_km:      float,
+    category:       str = None,
+) -> tuple[int, float]:
+
+    print(f"category is: '{poi_table}' and sub category is '{category}'")
+
+    # ─────────────────────────────────────────────────────────────
+    # Step 1: Find nearest EXISTING same-type facility within radius
+    # ─────────────────────────────────────────────────────────────
+    nearest_existing_dist = None
+    nearest_existing_poi  = None
+
     comp_index = poi_indexes.get(poi_table, {})
+
     candidates = query_spatial_index(
-                     comp_index,
-                     suggested_lat,
-                     suggested_lon,
-                     radius_km = radius_km
-                 )
+        comp_index,
+        suggested_lat,
+        suggested_lon,
+        radius_km=radius_km
+    )
 
-    for p in candidates:
-        d = haversine(suggested_lat, suggested_lon, p["lat"], p["lon"])
-        if nearest_existing is None or d < nearest_existing:
-            nearest_existing = d
+    # ── Filter same subtype only ─────────────────────────────────
+    filtered_candidates = candidates
 
-    # print(f"      nearest existing facility: "
-    #       f"{round(nearest_existing, 3) if nearest_existing else 'None'}km")
+    if category:
 
-    # ── Step 2: nearest other suggested location ──────────────────
-    nearest_suggested = None
+        category_lower = category.lower().strip()
 
-    for s in other_selected:
-        d = haversine(suggested_lat, suggested_lon, s["lat"], s["lon"])
-        if nearest_suggested is None or d < nearest_suggested:
-            nearest_suggested = d
+        filtered_candidates = [
+            p for p in candidates
+            if (
+                category_lower in (
+                    (p.get("sub_category") or "").lower()
+                )
+                or
+                category_lower in (
+                    (p.get("name") or "").lower()
+                )
+            )
+        ]
 
-    # print(f"      nearest suggested location: "
-    #       f"{round(nearest_suggested, 3) if nearest_suggested else 'None'}km")
+    # ── Use filtered if available, else fall back to all candidates
+    search_pool = (
+        filtered_candidates
+        if filtered_candidates
+        else candidates
+    )
 
-    # ── Step 3: pick minimum of both ─────────────────────────────
-    candidates_dist = [d for d in [nearest_existing, nearest_suggested]
-                       if d is not None]
+    for p in search_pool:
 
-    # nearest_suggested is ALWAYS available so this will never be empty
-    catchment_radius = min(candidates_dist)
+        p_lat = p.get("lat")
+        p_lon = p.get("lon")
 
-    # guard against 0 only
-    if catchment_radius <= 0:
-        catchment_radius = nearest_suggested   # ← use suggested as guard
+        if p_lat is None or p_lon is None:
+            continue
 
-    # print(f"      catchment_radius: {round(catchment_radius, 3)}km")
+        d = haversine(
+            suggested_lat,
+            suggested_lon,
+            p_lat,
+            p_lon
+        )
 
-    # ── Step 4: sum all grid populations within catchment radius ──
+        if (
+            nearest_existing_dist is None
+            or d < nearest_existing_dist
+        ):
+            nearest_existing_dist = d
+            nearest_existing_poi  = p
+
+    # ─────────────────────────────────────────────────────────────
+    # Step 2: Determine catchment radius
+    # If nearest existing found → use that distance
+    # If nothing found within radius → use full selected radius
+    # ─────────────────────────────────────────────────────────────
+    if nearest_existing_dist is not None:
+        catchment_radius = nearest_existing_dist
+    else:
+        catchment_radius = radius_km
+
+    # ─────────────────────────────────────────────────────────────
+    # Step 3: Count all grids within catchment radius
+    # All grids inside = potential customers, no ownership check
+    # ─────────────────────────────────────────────────────────────
     total_population = 0
+    grids_inside     = 0
+    grids_skipped    = 0
+
     for g in all_grids:
-        grid_lat = g.get("lat", g.get("center_lat"))
-        grid_lon = g.get("lon", g.get("center_lon"))
+
+        grid_lat = g.get("center_lat") or g.get("lat")
+        grid_lon = g.get("center_lon") or g.get("lon")
         grid_pop = g.get("population", 0)
 
         if grid_lat is None or grid_lon is None:
+            grids_skipped += 1
             continue
 
-        d = haversine(suggested_lat, suggested_lon, grid_lat, grid_lon)
-        if d <= catchment_radius:
+        dist_to_suggested = haversine(
+            suggested_lat,
+            suggested_lon,
+            grid_lat,
+            grid_lon
+        )
+
+        if dist_to_suggested <= catchment_radius:
             total_population += grid_pop
+            grids_inside     += 1
+
+    # ─────────────────────────────────────────────────────────────
+    # Debug logs
+    # ─────────────────────────────────────────────────────────────
+    print(
+        f"[catchment] "
+        f"lat={suggested_lat:.4f} "
+        f"lon={suggested_lon:.4f} | "
+        f"filtered_candidates={len(filtered_candidates)} | "
+        f"nearest_existing={nearest_existing_dist} | "
+        f"catchment_radius={catchment_radius} | "
+        f"grids_inside={grids_inside} | "
+        f"grids_skipped={grids_skipped} | "
+        f"total_pop={total_population}"
+    )
 
     return total_population, round(catchment_radius, 3)
 
+def get_top3_from_db(grids:      list,
+                     radius_km:  float,
+                     category:   str  = None,
+                     poi_data:   dict = None,
+                     poi_filter: list = None,
+                     rules:      dict = None,
+                     session:    dict = None) -> list:
 
-def get_top3_from_db(grids: list, radius_km: float,
-                     category: str = None,
-                     poi_data: dict = None) -> list:
-    
     if not grids:
         return []
 
-    # ← normalize keys RIGHT HERE before anything else
+    # ── Session center coords ─────────────────────────────────────
+    center_lat = session.get("lat") if session else None
+    center_lon = session.get("lon") if session else None
+
+    # ── Normalize grid keys + inject area center ──────────────────
     normalized_grids = []
+
     for g in grids:
         normalized_grids.append({
             **g,
-            "center_lat": g.get("center_lat", g.get("lat")),
-            "center_lon": g.get("center_lon", g.get("lon")),
-            "lat":        g.get("lat", g.get("center_lat")),
-            "lon":        g.get("lon", g.get("center_lon")),
+            "center_lat":      g.get("center_lat", g.get("lat")),
+            "center_lon":      g.get("center_lon", g.get("lon")),
+            "lat":             g.get("lat", g.get("center_lat")),
+            "lon":             g.get("lon", g.get("center_lon")),
+            "area_center_lat": center_lat,
+            "area_center_lon": center_lon,
+            "area_radius_km":  radius_km,
         })
+
     grids = normalized_grids
 
-    # Score dynamically if category + poi_data provided
-    poi_indexes = {}  # ← hoisted out so accessible later
-
-
-# poi_indexes looks like:
-# {
-#     "health_care": {
-#         (572, 1544): [Hospital_A, Hospital_B],
-#         (573, 1545): [Hospital_C],
-#     }
+    # ── Score grids ───────────────────────────────────────────────
+    poi_indexes = {}
 
     if category and poi_data:
+
         poi_data_normalized = _normalize_poi_keys(poi_data)
+
         poi_indexes = {
             k: build_spatial_index(v)
             for k, v in poi_data_normalized.items()
             if isinstance(v, list) and v
         }
-        rule_category = CATEGORY_TO_RULE.get(category, category)
-        grids    = score_grids_for_category(grids, poi_data_normalized, poi_indexes, rule_category)
+
+        grids = score_grids_for_category(
+            grids,
+            poi_data_normalized,
+            poi_indexes,
+            category,
+            poi_filter=poi_filter,
+            rules=rules,
+        )
+
         sort_key = "normalized_score"
+
     else:
         sort_key = "score"
 
-    min_km       = max(0.5, radius_km * 0.4)
-    sorted_grids = sorted(grids, key=lambda x: x.get(sort_key, 0), reverse=True)
+    # ── Sort by score descending ──────────────────────────────────
+    sorted_grids = sorted(
+        grids,
+        key=lambda x: x.get(sort_key, 0),
+        reverse=True
+    )
+
+    # ── Simple greedy selection — best score wins, just maintain spacing ──
+    spacing_km = rules.get("min_dist_km", 0.5) * 0.4 if rules else 0.5
+    min_km     = max(0.3, min(spacing_km, radius_km * 0.2))
 
     selected = []
+
     for g in sorted_grids:
+
         if not selected:
             selected.append(g)
             continue
+
         too_close = any(
-            haversine(g["lat"], g["lon"], s["lat"], s["lon"]) < min_km
+            haversine(
+                g["lat"],
+                g["lon"],
+                s["lat"],
+                s["lon"]
+            ) < min_km
             for s in selected
         )
+
         if not too_close:
             selected.append(g)
+
         if len(selected) == 3:
             break
 
-    # ── get poi_table from rules for catchment population ────────
-    rule_category = CATEGORY_TO_RULE.get(category, category) if category else None
-    rules         = FACILITY_RULES.get(rule_category, {})     if rule_category else {}
-    poi_table     = rules.get("poi_table")
+    # ── Fallback: if spacing too strict and less than 3 found, relax it ──
+    if len(selected) < 3:
 
+        relaxed_min_km = min_km * 0.5
+
+        for g in sorted_grids:
+
+            if g not in selected:
+
+                too_close = any(
+                    haversine(
+                        g["lat"],
+                        g["lon"],
+                        s["lat"],
+                        s["lon"]
+                    ) < relaxed_min_km
+                    for s in selected
+                )
+
+                if not too_close:
+                    selected.append(g)
+
+            if len(selected) == 3:
+                break
+
+    # ── get poi_table from rules for catchment population ─────────
+    poi_table = rules.get("poi_table") if rules else None
+
+    # ── Build result ──────────────────────────────────────────────
     result = []
+
     for i, g in enumerate(selected):
 
-        # ── other selected locations except current one ───────────
-        other_selected = [s for s in selected if s != g]
-
-        # ── catchment population calculation ─────────────────────
         if poi_table and poi_indexes:
+
             catchment_pop, radius_used = calculate_catchment_population(
-                suggested_lat  = g["lat"],
-                suggested_lon  = g["lon"],
-                all_grids      = normalized_grids, 
-                poi_indexes    = poi_indexes,
-                poi_table      = poi_table,
-                radius_km      = radius_km,
-                other_selected = other_selected,    # ← other suggested locations
+                suggested_lat=g["lat"],
+                suggested_lon=g["lon"],
+                all_grids=normalized_grids,
+                poi_indexes=poi_indexes,
+                poi_table=poi_table,
+                radius_km=radius_km,
+                category=category,
             )
-            # print(f"   Rank {i+1} → catchment radius: {radius_used}km, "
-            #       f"population: {catchment_pop}")
+
         else:
-            catchment_pop = g.get("population", 0)  # ← fallback to single grid
-        # ─────────────────────────────────────────────────────────
+            catchment_pop = g.get("population", 0)
 
         result.append({
             "rank":       i + 1,
@@ -371,12 +500,13 @@ def get_top3_from_db(grids: list, radius_km: float,
             "lon":        g["lon"],
             "score":      g.get("normalized_score", 0),
             "population": catchment_pop,
-            "label":      f"Score: {g.get('normalized_score', 0):.2f}, "
-                          f"Population: {catchment_pop}",
+            "label": (
+                f"Score: {g.get('normalized_score', 0):.2f}, "
+                f"Population: {catchment_pop}"
+            ),
         })
 
     return result
-
 
 # ────────────────────────────────────────────────────
 # CATEGORY DETECTION
@@ -404,52 +534,101 @@ def map_to_valid_category(cat: str) -> str | None:
     return None
 
 
-
-def _detect_category(question: str, llm) -> str | None:
+def _detect_category(question: str, llm) -> tuple[str | None, str | None]:
+    """Returns (broad_category, specific_keyword)"""
     q_lower = question.lower()
 
-    # ── 1. Keyword match (fast path) ──
-    for keyword, cat in PURPOSE_MAP.items():
-        if keyword in q_lower:
-            return cat
+    # ── 1. Fast path: scan CATEGORY_SYNONYMS directly ───────────────────────
+    for category, synonyms in CATEGORY_SYNONYMS.items():
+        for synonym in synonyms:
+            if synonym.lower() in q_lower:
+                return category, synonym   # ← returns matched keyword directly
 
-    # ── 2. LLM fallback ──
+    # ── 2. LLM fallback: category ONLY ──────────────────────────────────────
     try:
         prompt = f"""
-You are a facility classifier. Only classify if the question clearly refers to a real, recognizable facility type.
-
-Return STRICT JSON:
+You are a facility classifier for a GIS application.
+Return STRICT JSON only — no explanation, no markdown:
 {{"category": "<one_of_below_or_null>"}}
 
-Valid categories ONLY:
-hospitals, schools, restaurants, businesses, finance, recreation, shops, tourism, religious, infrastructure, building
+Valid categories: {', '.join(CATEGORY_SYNONYMS.keys())}
 
 Rules:
-- If the question contains a real facility type → return that category
-- If the word is gibberish, made-up, or unrecognizable → return null
-- If you are not confident → return null
+- Pick the single best matching category for the question.
+- If nothing matches, return null.
 
 Question: "{question}"
 """
         raw    = llm.invoke([HumanMessage(content=prompt)]).content.strip()
         raw    = raw.replace("```json", "").replace("```", "").strip()
         parsed = json.loads(raw)
+        cat    = parsed.get("category", "")
 
-        cat = parsed.get("category")
-
-        # ── NEW: reject null/none responses from LLM ──
         if not cat or cat.lower() in ("null", "none", ""):
-            return None
+            return None, None
 
-        print("LLM raw output is:", cat)
-        return map_to_valid_category(cat)
+        mapped_cat = map_to_valid_category(cat)
+        if not mapped_cat:
+            return None, None
+
+        # ── 3. Extract keyword from question using detected category ─────────
+        keyword = next(
+            (syn for syn in CATEGORY_SYNONYMS.get(mapped_cat, [])
+             if syn in q_lower),
+            None
+        )
+
+        print(f"LLM detected → category: {mapped_cat}, keyword: {keyword}")
+        return mapped_cat, keyword
 
     except Exception:
-        return None
+        return None, None
+    
+
+
+LISTING_WORDS = ["list", "show", "all", "display", "what are", "give me",
+                  "how many", "count", "which", "enumerate", "name",
+                 "are there", "any", "do we have", "nearby", "available"]
+
+LOCATION_WORDS = ["where", "best", "suggest", "recommend", "location",
+                  "spot", "find", "ideal",  "open"]
+
+def _detect_intent(question: str) -> str:
+    q = question.lower()
+
+    # LISTING takes priority — most explicit
+    if any(w in q for w in LISTING_WORDS):
+        return "LISTING"
+
+    # LOCATION second
+    if any(w in q for w in LOCATION_WORDS):
+        return "LOCATION"
+
+    return "ANALYSIS"
+
+
+def _resolve_rule(category: str, keyword: str | None) -> tuple[str, dict, list | None]:
+    if keyword:
+        keyword_lower = keyword.lower()
+        if keyword_lower in SUBCATEGORY_RULES:
+            rules = SUBCATEGORY_RULES[keyword_lower]
+            print(f"[RULE] SUBCATEGORY matched → '{keyword_lower}' | poi_filter:{rules} | poi_filter: {rules.get('poi_filter')} | min_dist_km: {rules.get('min_dist_km')}")
+            return keyword_lower, rules, rules.get("poi_filter")
+        else:
+            print(f"[RULE] SUBCATEGORY miss → keyword='{keyword_lower}' not in SUBCATEGORY_RULES")
+
+    rule_key = CATEGORY_TO_RULE.get(category, category)
+    rules    = FACILITY_RULES.get(rule_key)
+    if not rules:
+        print(f"[RULE] No rules found for '{rule_key}'")
+        return rule_key, {}, None    
+    print(f"[RULE] FACILITY fallback → category='{category}' mapped to '{rule_key}'")
+    return rule_key, rules, None
+
 
 # ────────────────────────────────────────────────────
 # MAIN AGENT
-# ────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────
 
 def ask_agent(question: str, session: dict) -> dict:
 
@@ -465,31 +644,34 @@ def ask_agent(question: str, session: dict) -> dict:
 
     q_lower = question.lower()
 
-    location_words = ["where", "best", "suggest", "recommend", "location", "spot"]
-    intent = "LOCATION" if any(w in q_lower for w in location_words) else "ANALYSIS"
+    # ── Intent detection ──────────────────────────────
+    # LISTING takes priority — most explicit intent
+    intent = _detect_intent(question)
 
     # ── Category detection ────────────────────────────
-    matched_category = _detect_category(question, llm) if intent == "LOCATION" else None
+    matched_category, matched_keyword = _detect_category(question, llm)
 
-    # ── For ANALYSIS intent, also try to detect category for context ──
-    if intent == "ANALYSIS":
-        matched_category = _detect_category(question, llm)
+    print(f"Intent={intent} | Category={matched_category} | Keyword={matched_keyword}")
 
-    print(f"Intent={intent} | Category={matched_category}")
-
-    # ── Dynamic scoring + top 3 ───────────────────────
+    # ── Dynamic scoring + top 3 (only for LOCATION) ───
     suggestions = []
     grids       = []
 
     if intent == "LOCATION" and matched_category and session.get("poi_data"):
         grids    = session["poi_data"].get("grids", [])
         poi_data = session["poi_data"].get("pois",  {})
+        
+         # ── Resolve to subcategory rule if keyword matched ────────
+        rule_key, rules, poi_filter = _resolve_rule(matched_category, matched_keyword)
 
         scored_grids = get_top3_from_db(
             grids     = grids,
             radius_km = session["radius"],
-            category  = matched_category,
+            category  = rule_key,
             poi_data  = poi_data,
+            poi_filter = poi_filter,
+            rules      = rules,
+            session    = session, # ← pass resolved rules directly
         )
 
         if not scored_grids:
@@ -517,33 +699,47 @@ def ask_agent(question: str, session: dict) -> dict:
     poi_counts  = _get_poi_counts(session)
     suitability = _get_suitability(session)
 
-    use_semantic = any(w in q_lower for w in
-                       ["near", "nearby", "around", "find", "search"])
-    nearby = _search_nearby(question, session) if use_semantic else \
-             "Context derived from structured database."
+    # ── POI list for LISTING intent ───────────────────
 
-    # ── Actual POI list for listing questions ─────────
-    listing_words = ["list", "show", "all", "display", "what are", "give me"]
-    wants_listing = any(w in q_lower for w in listing_words)
-    poi_list_text = (
-        _get_category_pois(matched_category, session)
-        if wants_listing and matched_category
-        else ""
-    )
+    if intent == "LISTING" and matched_category:
+        raw = _get_category_pois(matched_category, session, keyword=matched_keyword)
+        
+         # ✅ DEBUG PRINTS (move here)
+        print("==== DEBUG LISTING ====")
+        print("Category:", matched_category)
+        print("Keyword :", matched_keyword)
+        print("Raw POIs:\n", raw)
 
-    # ── Memory (lightweight context) ───────────────────
+
+        if raw.startswith("__NONE_FOUND__:"):
+            queried_type = raw.split(":", 1)[1]
+            return {
+                "response":    f"There are no {queried_type} recorded in the "
+                               f"selected area. Try expanding the radius or ask "
+                               f"about a different facility type.",
+                "suggestions": None,
+                "grids":       []
+            }
+
+        return {
+            "response": f"Here are all the {matched_keyword or matched_category} in this area:\n\n{raw}",
+            "suggestions": None,
+            "grids": []
+        }
+        
+
+
+    # DEBUG — remove after confirming
+
+    # ── Memory ────────────────────────────────────────
     previous_q = session.get("last_question", "None")
 
+    # ── System prompt ─────────────────────────────────
     system_prompt = f"""
 You are an expert Location Intelligence Consultant specializing in site selection and urban analysis.
 
-IMPORTANT: Only use the data provided below. Do NOT mention any places outside this dataset.
-
 ## AREA DATA
 {poi_counts}
-
-## NEARBY INSIGHTS
-{nearby}
 
 ## AREA SUITABILITY
 {suitability}
@@ -553,8 +749,7 @@ Previous question: {previous_q}
 
 """
 
-    if poi_list_text:
-        system_prompt += f"\n## {matched_category.upper()} IN THIS AREA\n{poi_list_text}\n"
+
 
     if suggestions:
         system_prompt += "\n## TOP 3 RECOMMENDED LOCATIONS\n"
@@ -575,9 +770,9 @@ Use this format:
 <brief insight>
 
 Location 1 (mention direction like North/East etc.)
-- Nearby advantages
+- Available facilities nearby (ONLY mention from AREA DATA above)
 - Population coverage
-- Why it is suitable
+- Why it is suitable for the requested facility type
 
 Location 2
 - Same structure
@@ -606,3 +801,4 @@ Guidelines:
         "suggestions": suggestions,
         "grids":       grids
     }
+    
