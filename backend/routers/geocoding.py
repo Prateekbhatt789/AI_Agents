@@ -39,7 +39,7 @@ async def fetch_roads(request: POIRequest, db: Session = Depends(get_db)):
                     :radius_m
                 )::geometry AS geom
             )
-            SELECT r."id",r."ALT_NAME",r."TYPE",
+            SELECT r."id",r."ALT_NAME",r."TYPE",r."category",
                 ST_AsGeoJSON(ST_Intersection(r.geom, s.geom))::json AS geometry
             FROM "data".road_network_ml r
             JOIN search_area s
@@ -66,6 +66,7 @@ async def fetch_roads(request: POIRequest, db: Session = Depends(get_db)):
                         "id": row["id"],
                         "road_name": row.get("road_name"),
                         "highway": row.get("highway"),
+                        "category": row.get("category"),
                     },
                 }
                 for row in rows
