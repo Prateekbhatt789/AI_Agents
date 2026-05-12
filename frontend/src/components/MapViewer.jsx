@@ -301,16 +301,32 @@ function lineCoordinatesToPositions(coordinates) {
         .map(([lng, lat]) => [lat, lng])
 }
 
+function getRoadCategory(featureOrRoad) {
+    return normalizeKey(
+        featureOrRoad?.properties?.category ||
+        featureOrRoad?.category ||
+        featureOrRoad?.properties?.TYPE ||
+        featureOrRoad?.TYPE
+    )
+}
+
+function getRoadPathOptions(featureOrRoad) {
+    const category = getRoadCategory(featureOrRoad)
+    const color = category === 'secondary' ? '#22c55e' : '#ef4444'
+
+    return {
+        color,
+        weight: 2.2,
+        opacity: 0.85,
+    }
+}
+
 function RoadLayer({ roadData = [] }) {
     if (roadData?.type === 'FeatureCollection' || roadData?.type === 'Feature') {
         return (
             <GeoJSON
                 data={roadData}
-                style={{
-                    color: '#ef4444',
-                    weight: 2.2,
-                    opacity: 0.85,
-                }}
+                style={getRoadPathOptions}
             />
         )
     }
@@ -330,11 +346,7 @@ function RoadLayer({ roadData = [] }) {
                 <Polyline
                     key={road.id || road.road_id || `road-${index}`}
                     positions={positions}
-                    pathOptions={{
-                        color: '#ef4444',
-                        weight: 2.2,
-                        opacity: 0.85,
-                    }}
+                    pathOptions={getRoadPathOptions(road)}
                 />
             )
         }
@@ -349,11 +361,7 @@ function RoadLayer({ roadData = [] }) {
                 <Polyline
                     key={road.id || road.road_id || `road-${index}`}
                     positions={positions}
-                    pathOptions={{
-                        color: '#ef4444',
-                        weight: 2.2,
-                        opacity: 0.85,
-                    }}
+                    pathOptions={getRoadPathOptions(road)}
                 />
             )
         }
