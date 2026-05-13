@@ -87,12 +87,22 @@ export async function chatWithAgent(message, sessionId = null) {
 }
 
 // 5. Download PDF → returns a file blob
-export async function exportPDF(location, lat, lon, radius_km, summary) {
+export async function exportPDF(location, lat, lon, radius_km, summary, roadSummary, suggestions) {
     const response = await fetch(`${BASE}/export-pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location, lat, lon, radius_km, summary })
+        body: JSON.stringify({
+            location,
+            lat,
+            lon,
+            radius_km,
+            summary,
+            road_summary: roadSummary ?? {},
+            suggestions: suggestions ?? [],
+        })
     })
+
+    if (!response.ok) throw new Error('PDF export failed')
     return response.blob()
 }
 

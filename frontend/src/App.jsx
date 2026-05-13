@@ -103,6 +103,7 @@ export default function App() {
   const [contextualMode, setContextualMode] = useState('panel')
   const [selectedCategories, setSelectedCategories] = useState([])
   const [selectedSubcategories, setSelectedSubcategories] = useState({})
+  const [roadSummary, setRoadSummary] = useState({})
 
   // to show grid over map 
   const [gridData, setGridData] = useState([])
@@ -205,8 +206,10 @@ export default function App() {
     try {
       setStatus('Fetching data ...')
       const pois = await fetchPOIs(lat, lon, radiusKm)
+      console.log("Grids data is", pois)
       setPoiData(pois)
       setSummary(pois.summary)
+      setRoadSummary(pois.road_summary ?? {})
       setSelectedCategories(Object.keys(pois.pois || {}).map(normalizeKey))
       setSelectedSubcategories({})
       // to show the grid layer over the map
@@ -237,10 +240,32 @@ export default function App() {
     }
   }
 
+  // async function handleDownload() {
+  //   if (!isAnalyzed) return
+  //   try {
+  //     const blob = await exportPDF(locationName, lat, lon, radiusKm, summary)
+  //     const url = URL.createObjectURL(blob)
+  //     const a = document.createElement('a')
+  //     a.href = url
+  //     a.download = 'site_report.pdf'
+  //     a.click()
+  //     URL.revokeObjectURL(url)
+  //   } catch {
+  //     alert('PDF failed.')
+  //   }
+  // }
   async function handleDownload() {
     if (!isAnalyzed) return
     try {
-      const blob = await exportPDF(locationName, lat, lon, radiusKm, summary)
+      const blob = await exportPDF(
+        locationName,
+        lat,
+        lon,
+        radiusKm,
+        summary,
+        roadSummary,    // ← new
+        suggestions     // ← already exists as state
+      )
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

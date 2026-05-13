@@ -71,7 +71,8 @@ def get_empty_land_grids():
         conn.commit()
 
         # =========================================================
-        # STEP 2 — Create grid
+        # STEP 2 — Create grid  
+        # ST_Transform((SELECT geom FROM tmp_usable_land), 3857)  due to it size of grid become 87.5 not 100m EPSG:32643
         # =========================================================
         cur.execute(f"""
             CREATE TEMP TABLE tmp_grid AS

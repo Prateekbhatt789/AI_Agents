@@ -4,13 +4,14 @@ import json
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from difflib import get_close_matches
-from services.pinecone_store import search_pois, make_namespace
+# from services.pinecone_store import search_pois, make_namespace
 from services.grid_scorer import (
     score_grids_for_category,
     build_spatial_index,
     FACILITY_RULES,
     SUBCATEGORY_RULES,
-  query_spatial_index
+  query_spatial_index,
+  haversine,
     
 )
 from dotenv import load_dotenv
@@ -90,15 +91,26 @@ def create_session() -> dict:
     }
 
 
+# def set_session(session, location, summary, radius_km,
+#                 lat=None, lon=None, poi_data=None):
+#     session["location"] = location
+#     session["summary"]  = summary
+#     session["radius"]   = radius_km
+
+#     if lat:      session["lat"]      = lat
+#     if lon:      session["lon"]      = lon
+#     if poi_data: session["poi_data"] = poi_data
+
 def set_session(session, location, summary, radius_km,
                 lat=None, lon=None, poi_data=None):
-    session["location"] = location
-    session["summary"]  = summary
-    session["radius"]   = radius_km
-
-    if lat:      session["lat"]      = lat
-    if lon:      session["lon"]      = lon
-    if poi_data: session["poi_data"] = poi_data
+    session["location"]     = location
+    session["summary"]      = summary
+    session["radius"]       = radius_km
+    if lat:      session["lat"]          = lat
+    if lon:      session["lon"]          = lon
+    if poi_data:
+        session["poi_data"]     = poi_data
+        session["road_summary"] = poi_data.get("road_summary", {})  # ← store here
 
 
 # ────────────────────────────────────────────────────
@@ -166,7 +178,7 @@ def _get_category_pois(category: str, session: dict, keyword: str = None) -> str
             if (p.get("sub_category") or "").lower().strip() == keyword
         ]
 
-    print(f"Total POIs found: {len(items)}")
+    # print(f"Total POIs found: {len(items)}")
 
     if not items:
         return f"__NONE_FOUND__:{keyword or category}"
@@ -179,19 +191,6 @@ def _get_category_pois(category: str, session: dict, keyword: str = None) -> str
         lines.append(f"{i}. {name} ({lat}, {lon})")
 
     return "\n".join(lines)
-
-# ────────────────────────────────────────────────────
-# HAVERSINE
-# ────────────────────────────────────────────────────
-
-def haversine(lat1, lon1, lat2, lon2):
-    R                       = 6371
-    lat1, lon1, lat2, lon2  = map(math.radians, [lat1, lon1, lat2, lon2])
-    dlat                    = lat2 - lat1
-    dlon                    = lon2 - lon1
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2)
-    return 2 * R * math.asin(math.sqrt(a))
 
 
 # ────────────────────────────────────────────────────
@@ -230,7 +229,7 @@ def calculate_catchment_population(
     category:       str = None,
 ) -> tuple[int, float]:
 
-    print(f"category is: '{poi_table}' and sub category is '{category}'")
+    # print(f"category is: '{poi_table}' and sub category is '{category}'")
 
     # ─────────────────────────────────────────────────────────────
     # Step 1: Find nearest EXISTING same-type facility within radius
@@ -335,22 +334,8 @@ def calculate_catchment_population(
             total_population += grid_pop
             grids_inside     += 1
 
-    # ─────────────────────────────────────────────────────────────
-    # Debug logs
-    # ─────────────────────────────────────────────────────────────
-    print(
-        f"[catchment] "
-        f"lat={suggested_lat:.4f} "
-        f"lon={suggested_lon:.4f} | "
-        f"filtered_candidates={len(filtered_candidates)} | "
-        f"nearest_existing={nearest_existing_dist} | "
-        f"catchment_radius={catchment_radius} | "
-        f"grids_inside={grids_inside} | "
-        f"grids_skipped={grids_skipped} | "
-        f"total_pop={total_population}"
-    )
-
     return total_population, round(catchment_radius, 3)
+
 
 def get_top3_from_db(grids:      list,
                      radius_km:  float,
@@ -367,19 +352,27 @@ def get_top3_from_db(grids:      list,
     center_lat = session.get("lat") if session else None
     center_lon = session.get("lon") if session else None
 
-    # ── Normalize grid keys + inject area center ──────────────────
+    # ── Normalize grid keys + inject area center + road fields ────
     normalized_grids = []
 
     for g in grids:
         normalized_grids.append({
             **g,
-            "center_lat":      g.get("center_lat", g.get("lat")),
-            "center_lon":      g.get("center_lon", g.get("lon")),
-            "lat":             g.get("lat", g.get("center_lat")),
-            "lon":             g.get("lon", g.get("center_lon")),
-            "area_center_lat": center_lat,
-            "area_center_lon": center_lon,
-            "area_radius_km":  radius_km,
+            "center_lat":                 g.get("center_lat", g.get("lat")),
+            "center_lon":                 g.get("center_lon", g.get("lon")),
+            "lat":                        g.get("lat", g.get("center_lat")),
+            "lon":                        g.get("lon", g.get("center_lon")),
+            "area_center_lat":            center_lat,
+            "area_center_lon":            center_lon,
+            "area_radius_km":             radius_km,
+            "road_density":               g.get("road_density", 0) or 0,
+            "dist_to_primary":            g.get("dist_to_primary"),
+            "dist_to_secondary":          g.get("dist_to_secondary"),
+            "primary_length":             g.get("primary_length", 0) or 0,
+            "secondary_length":           g.get("secondary_length", 0) or 0,
+            "total_road_length":          g.get("total_road_length", 0) or 0,
+            "nearest_primary_road_id":    g.get("nearest_primary_road_id"),
+            "nearest_secondary_road_id":  g.get("nearest_secondary_road_id"),
         })
 
     grids = normalized_grids
@@ -418,7 +411,7 @@ def get_top3_from_db(grids:      list,
         reverse=True
     )
 
-    # ── Simple greedy selection — best score wins, just maintain spacing ──
+    # ── Greedy selection — maintain spacing ───────────────────────
     spacing_km = rules.get("min_dist_km", 0.5) * 0.4 if rules else 0.5
     min_km     = max(0.3, min(spacing_km, radius_km * 0.2))
 
@@ -431,12 +424,7 @@ def get_top3_from_db(grids:      list,
             continue
 
         too_close = any(
-            haversine(
-                g["lat"],
-                g["lon"],
-                s["lat"],
-                s["lon"]
-            ) < min_km
+            haversine(g["lat"], g["lon"], s["lat"], s["lon"]) < min_km
             for s in selected
         )
 
@@ -446,7 +434,7 @@ def get_top3_from_db(grids:      list,
         if len(selected) == 3:
             break
 
-    # ── Fallback: if spacing too strict and less than 3 found, relax it ──
+    # ── Fallback: relax spacing if less than 3 found ──────────────
     if len(selected) < 3:
 
         relaxed_min_km = min_km * 0.5
@@ -456,12 +444,7 @@ def get_top3_from_db(grids:      list,
             if g not in selected:
 
                 too_close = any(
-                    haversine(
-                        g["lat"],
-                        g["lon"],
-                        s["lat"],
-                        s["lon"]
-                    ) < relaxed_min_km
+                    haversine(g["lat"], g["lon"], s["lat"], s["lon"]) < relaxed_min_km
                     for s in selected
                 )
 
@@ -471,17 +454,16 @@ def get_top3_from_db(grids:      list,
             if len(selected) == 3:
                 break
 
-    # ── get poi_table from rules for catchment population ─────────
+    # ── poi_table for catchment population ────────────────────────
     poi_table = rules.get("poi_table") if rules else None
 
-    # ── Build result ──────────────────────────────────────────────
+    # ── Build result with road context ───────────────────────────
     result = []
 
     for i, g in enumerate(selected):
 
         if poi_table and poi_indexes:
-
-            catchment_pop, radius_used = calculate_catchment_population(
+            catchment_pop, _ = calculate_catchment_population(
                 suggested_lat=g["lat"],
                 suggested_lon=g["lon"],
                 all_grids=normalized_grids,
@@ -490,16 +472,58 @@ def get_top3_from_db(grids:      list,
                 radius_km=radius_km,
                 category=category,
             )
-
         else:
             catchment_pop = g.get("population", 0)
 
+        # ── Road context for LLM ──────────────────────────────────
+        primary_len    = g.get("primary_length",   0) or 0
+        secondary_len  = g.get("secondary_length", 0) or 0
+        dist_primary   = g.get("dist_to_primary")
+        dist_secondary = g.get("dist_to_secondary")
+        road_density   = g.get("road_density",     0) or 0
+
+        if primary_len > 0 and secondary_len > 0:
+            road_desc = (
+                f"Both primary ({primary_len:.0f}m) and secondary "
+                f"({secondary_len:.0f}m) roads pass through this location"
+            )
+        elif primary_len > 0:
+            road_desc = (
+                f"Primary road passes through ({primary_len:.0f}m), "
+                f"nearest secondary road is "
+                f"{dist_secondary:.0f}m away" if dist_secondary is not None
+                else f"Primary road passes through ({primary_len:.0f}m)"
+            )
+        elif secondary_len > 0:
+            road_desc = (
+                f"Secondary road passes through ({secondary_len:.0f}m), "
+                f"nearest primary road is "
+                f"{dist_primary:.0f}m away" if dist_primary is not None
+                else f"Secondary road passes through ({secondary_len:.0f}m)"
+            )
+        else:
+            parts = []
+            if dist_primary is not None:
+                parts.append(f"nearest primary road {dist_primary:.0f}m away")
+            if dist_secondary is not None:
+                parts.append(f"secondary road {dist_secondary:.0f}m away")
+            road_desc = (
+                "No road passes through directly — " + ", ".join(parts)
+                if parts else "No road data available"
+            )
+
         result.append({
-            "rank":       i + 1,
-            "lat":        g["lat"],
-            "lon":        g["lon"],
-            "score":      g.get("normalized_score", 0),
-            "population": catchment_pop,
+            "rank":            i + 1,
+            "lat":             g["lat"],
+            "lon":             g["lon"],
+            "score":           g.get("normalized_score", 0),
+            "population":      catchment_pop,
+            "primary_length":  round(primary_len,   1),
+            "secondary_length":round(secondary_len, 1),
+            "dist_to_primary": round(dist_primary,  1) if dist_primary   is not None else None,
+            "dist_to_secondary":round(dist_secondary,1) if dist_secondary is not None else None,
+            "road_density":    round(road_density,  1),
+            "road_desc":       road_desc,
             "label": (
                 f"Score: {g.get('normalized_score', 0):.2f}, "
                 f"Population: {catchment_pop}"
@@ -578,7 +602,7 @@ Question: "{question}"
             None
         )
 
-        print(f"LLM detected → category: {mapped_cat}, keyword: {keyword}")
+        # print(f"LLM detected → category: {mapped_cat}, keyword: {keyword}")
         return mapped_cat, keyword
 
     except Exception:
@@ -630,6 +654,7 @@ def _resolve_rule(category: str, keyword: str | None) -> tuple[str, dict, list |
 # MAIN AGENT
 # ───────────────────────────────────────────────────
 
+
 def ask_agent(question: str, session: dict) -> dict:
 
     question = question[:500].strip()
@@ -642,10 +667,7 @@ def ask_agent(question: str, session: dict) -> dict:
         temperature = 0.2,
     )
 
-    q_lower = question.lower()
-
     # ── Intent detection ──────────────────────────────
-    # LISTING takes priority — most explicit intent
     intent = _detect_intent(question)
 
     # ── Category detection ────────────────────────────
@@ -655,23 +677,22 @@ def ask_agent(question: str, session: dict) -> dict:
 
     # ── Dynamic scoring + top 3 (only for LOCATION) ───
     suggestions = []
-    grids       = []
+    grids       = []   # ← initialized here
 
     if intent == "LOCATION" and matched_category and session.get("poi_data"):
         grids    = session["poi_data"].get("grids", [])
         poi_data = session["poi_data"].get("pois",  {})
-        
-         # ── Resolve to subcategory rule if keyword matched ────────
+
         rule_key, rules, poi_filter = _resolve_rule(matched_category, matched_keyword)
 
         scored_grids = get_top3_from_db(
-            grids     = grids,
-            radius_km = session["radius"],
-            category  = rule_key,
-            poi_data  = poi_data,
+            grids      = grids,
+            radius_km  = session["radius"],
+            category   = rule_key,
+            poi_data   = poi_data,
             poi_filter = poi_filter,
             rules      = rules,
-            session    = session, # ← pass resolved rules directly
+            session    = session,
         )
 
         if not scored_grids:
@@ -700,16 +721,12 @@ def ask_agent(question: str, session: dict) -> dict:
     suitability = _get_suitability(session)
 
     # ── POI list for LISTING intent ───────────────────
-
     if intent == "LISTING" and matched_category:
         raw = _get_category_pois(matched_category, session, keyword=matched_keyword)
-        
-         # ✅ DEBUG PRINTS (move here)
+
         print("==== DEBUG LISTING ====")
         print("Category:", matched_category)
         print("Keyword :", matched_keyword)
-        print("Raw POIs:\n", raw)
-
 
         if raw.startswith("__NONE_FOUND__:"):
             queried_type = raw.split(":", 1)[1]
@@ -722,14 +739,10 @@ def ask_agent(question: str, session: dict) -> dict:
             }
 
         return {
-            "response": f"Here are all the {matched_keyword or matched_category} in this area:\n\n{raw}",
+            "response":    f"Here are all the {matched_keyword or matched_category} in this area:\n\n{raw}",
             "suggestions": None,
-            "grids": []
+            "grids":       []
         }
-        
-
-
-    # DEBUG — remove after confirming
 
     # ── Memory ────────────────────────────────────────
     previous_q = session.get("last_question", "None")
@@ -746,33 +759,62 @@ You are an expert Location Intelligence Consultant specializing in site selectio
 
 ## USER CONTEXT
 Previous question: {previous_q}
-
 """
 
-
-
+    # ── Inject road context into system prompt ────────
     if suggestions:
         system_prompt += "\n## TOP 3 RECOMMENDED LOCATIONS\n"
+
         for s in suggestions:
-            system_prompt += (
-                f"Rank {s['rank']} → {s['lat']:.5f}, {s['lon']:.5f} "
-                f"(Population: {s['population']})\n"
-            )
+            primary_len    = s.get("primary_length",    0) or 0
+            secondary_len  = s.get("secondary_length",  0) or 0
+            dist_primary   = s.get("dist_to_primary")
+            dist_secondary = s.get("dist_to_secondary")
+            road_density   = s.get("road_density",      0) or 0
+            road_desc      = s.get("road_desc", "No road data available")
+
+            # Population context
+            pop = s.get("population", 0)
+            if pop > 5000:    pop_desc = f"{pop:,} (HIGH density area)"
+            elif pop > 2000:  pop_desc = f"{pop:,} (MEDIUM density area)"
+            else:             pop_desc = f"{pop:,} (LOW density area)"
+
+            # Road quality label
+            if primary_len > 0 and secondary_len > 0:
+                road_quality = "EXCELLENT — direct access to both primary and secondary roads"
+            elif primary_len > 0:
+                road_quality = "GOOD — primary road passes directly through"
+            elif secondary_len > 0:
+                road_quality = f"MODERATE — secondary road present, nearest primary road {dist_primary:.0f}m away" \
+                               if dist_primary is not None else "MODERATE — secondary road present"
+            else:
+                road_quality = f"LIMITED — no direct road, nearest primary {dist_primary:.0f}m away" \
+                               if dist_primary is not None else "LIMITED — no direct road access"
+
+            system_prompt += f"""
+Rank {s['rank']} → Coordinates: {s['lat']:.5f}, {s['lon']:.5f}
+  Population coverage : {pop_desc}
+  Road access         : {road_desc}
+  Road quality        : {road_quality}
+  Road density        : {road_density:.0f} m/km² (higher = better connected street network)
+"""
 
         system_prompt += """
+
 ## RESPONSE INSTRUCTIONS (VERY IMPORTANT)
 
-- Start with a short summary (1–2 lines)
-- Then explain each location clearly
+You have been given 3 scored locations with full context including population, road access and road quality.
+Your job is to explain WHY each location is recommended in plain, professional language.
 
-Use this format:
+Use this format strictly:
 
-<brief insight>
+<1-2 line summary of overall recommendation>
 
-Location 1 (mention direction like North/East etc.)
-- Available facilities nearby (ONLY mention from AREA DATA above)
-- Population coverage
-- Why it is suitable for the requested facility type
+Location 1 (mention cardinal direction — North/South/East/West of area center)
+- ROAD ACCESS: explain road access in plain language using the road data provided
+- POPULATION: mention population coverage and what it means for the facility
+- NEARBY AMENITIES: mention relevant facilities from AREA DATA (only what is relevant)
+- WHY SUITABLE: 1-2 lines explaining why this specific location works for the requested facility type
 
 Location 2
 - Same structure
@@ -780,12 +822,14 @@ Location 2
 Location 3
 - Same structure
 
-Guidelines:
-- Keep response professional but conversational
-- Use bullet points for clarity
-- Highlight important insights using CAPITAL WORDS instead of bold
-- Do NOT mention technical terms like "score", "grid", or backend logic
-- Make response visually clean and easy to read
+## STRICT GUIDELINES
+- Use the road data provided — do NOT say "good road access" without explaining which roads
+- Population context matters — mention if it is high/medium/low density
+- Do NOT mention technical terms like "score", "grid", "normalized", or "percentile"
+- Do NOT say "based on the data" or "according to the system"
+- Use CAPITAL WORDS to highlight key insights instead of bold
+- Keep each location explanation to 4-5 bullet points maximum
+- Sound like a human consultant, not a data report
 """
 
     response = llm.invoke([
@@ -799,6 +843,7 @@ Guidelines:
     return {
         "response":    response.content,
         "suggestions": suggestions,
-        "grids":       grids
+        "grids":       []
     }
-    
+
+
