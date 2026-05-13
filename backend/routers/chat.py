@@ -136,6 +136,7 @@ async def chat(request: ChatRequest,
 
     try:
         result      = ask_agent(request.message, session)
+        # print("Result of llm is :", result)
         suggestions = result.get("suggestions")
 
         print(f" suggestions count: {len(suggestions) if suggestions else 0}")
