@@ -193,7 +193,7 @@ def create_kml(df, output_file="empty_land_grids1.kml"):
 </kml>
 """)
 
-    print(f"✅ KML file created successfully: {output_file}")
+    print(f"KML file created successfully: {output_file}")
     print(f"Total polygons written: {count}")
 
 

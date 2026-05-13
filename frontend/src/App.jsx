@@ -5,6 +5,7 @@ import { GlobeIcon, LoaderIcon } from './components/Icons'
 import {
   searchLocation,
   fetchPOIs,
+  fetchRoads,
   analyzeLocation,
   chatWithAgent,
   exportPDF,
@@ -106,7 +107,9 @@ export default function App() {
 
   // to show grid over map 
   const [gridData, setGridData] = useState([])
+  const [roadData, setRoadData] = useState([])
   const [showGrid, setShowGrid] = useState(false)
+  const [showRoad, setShowRoad] = useState(false)
   // for enabling and disabling the button 
   const SHOW_GRID_BUTTON = import.meta.env.VITE_SHOW_GRID_BUTTON === 'true'
 
@@ -190,7 +193,9 @@ export default function App() {
     setSelectedCategories([])
     setSelectedSubcategories({})
     setGridData([])
+    setRoadData([])
     setShowGrid(false)
+    setShowRoad(false)
     setStatus('Ready')
   }
 
@@ -269,6 +274,30 @@ export default function App() {
       URL.revokeObjectURL(url)
     } catch {
       alert('PDF failed.')
+    }
+  }
+
+  async function handleToggleRoad() {
+    if (!lat || !lon) return
+
+    if (showRoad) {
+      setShowRoad(false)
+      return
+    }
+
+    try {
+      if (!roadData.length) {
+        setStatus('Fetching road data...')
+        const roads = await fetchRoads(lat, lon, radiusKm)
+        setRoadData(Array.isArray(roads) ? roads : roads?.roads ?? roads?.features ?? roads?.data ?? [])
+      }
+
+      setShowRoad(true)
+      setStatus('Done')
+    } catch (error) {
+      console.error(error)
+      setStatus('Failed to fetch road data')
+      alert(error.message || 'Failed to fetch road data.')
     }
   }
 
@@ -490,19 +519,28 @@ export default function App() {
           )}
 
           {SHOW_GRID_BUTTON && isAnalyzed && (
-            <button
-              onClick={() => setShowGrid(prev => !prev)}
-              className={`absolute bottom-3 left-3 z-[1000] rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-md backdrop-blur-sm transition-all
+            <div className="absolute bottom-3 left-3 z-[1000] flex flex-col items-start gap-2">
+              <button
+                onClick={() => setShowGrid(prev => !prev)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-md backdrop-blur-sm transition-all
                   ${showGrid
-                  ? 'bg-cyan-600 text-white border-cyan-700'
-                  : 'bg-white/90 text-slate-700 border-slate-300 hover:border-cyan-400 hover:text-cyan-600'
-                }`}
-            >
-              {showGrid ? 'Hide Grid' : 'Show Grid'}
-            </button>
-
-
-
+                    ? 'bg-cyan-600 text-white border-cyan-700'
+                    : 'bg-white/90 text-slate-700 border-slate-300 hover:border-cyan-400 hover:text-cyan-600'
+                  }`}
+              >
+                {showGrid ? 'Hide Grid' : 'Show Grid'}
+              </button>
+              <button
+                onClick={handleToggleRoad}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-md backdrop-blur-sm transition-all
+                  ${showRoad
+                    ? 'bg-cyan-600 text-white border-cyan-700'
+                    : 'bg-white/90 text-slate-700 border-slate-300 hover:border-cyan-400 hover:text-cyan-600'
+                  }`}
+              >
+                {showRoad ? 'Hide Road' : 'Show Road'}
+              </button>
+            </div>
           )}
 
           <MapViewer
@@ -517,6 +555,8 @@ export default function App() {
             trigger={showChat}
             gridData={gridData}
             showGrid={showGrid}
+            roadData={roadData}
+            showRoad={showRoad}
             selectedCategories={selectedCategories}
             setSelectedCategories={setSelectedCategories}
             selectedSubcategories={selectedSubcategories}
