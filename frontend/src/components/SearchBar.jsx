@@ -10,9 +10,8 @@ export default function SearchBar({
     locationFound,
     isAnalyzing,
     locationName,
-    setRadiusKm,
-    showGrid, setShowGrid
-    // to show grid over map
+    showGrid, setShowGrid,
+    onRadiusChange,
 }) {
 
     const [query, setQuery] = useState('')
@@ -21,16 +20,27 @@ export default function SearchBar({
     const radiusOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     const [radiusIndex, setRadiusIndex] = useState(0)
     const geojson = JSON.parse(boundary)
+    // useEffect(() => {
+    //     if (locationName) {
+    //         setQuery(locationName)
+    //     }
+    // }, [locationName])
+
+
+
     useEffect(() => {
         if (locationName) {
             setQuery(locationName)
+            setIsSearchExecuted(true)
+        } else {
+            setIsSearchExecuted(false)
         }
     }, [locationName])
 
     useEffect(() => {
         const newRadius = radiusOptions[radiusIndex]
         setRadius(newRadius)
-        setRadiusKm(newRadius)
+        onRadiusChange?.(newRadius)
     }, [radiusIndex])
 
     async function handleSearch() {
@@ -44,11 +54,19 @@ export default function SearchBar({
         setIsSearchExecuted(false)
     }
 
+    // function handleClearSearch() {
+    //     setQuery('')
+    //     setIsSearchExecuted(false)
+    //     onClearSearch?.()
+    // }
+
     function handleClearSearch() {
         setQuery('')
         setIsSearchExecuted(false)
+        setRadiusIndex(0)   // ← resets slider back to 1km
         onClearSearch?.()
     }
+
     const percentage = (radiusIndex / (radiusOptions.length - 1)) * 100;
     return (
         <div className="group rounded-xl  bg-white/72 p-2 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl">
@@ -192,7 +210,7 @@ export default function SearchBar({
             </div>
             <button
                 onClick={() => {
-                    onAnalyze()
+                    onAnalyze(radius)
                 }}
                 disabled={!locationFound || isAnalyzing}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/40 transition-all duration-200 hover:shadow-xl hover:shadow-blue-600/50  disabled:cursor-not-allowed disabled:from-[#87aacf] disabled:to-[#3d88d8] disabled:shadow-none disabled:opacity-60"

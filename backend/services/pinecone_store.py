@@ -46,6 +46,12 @@ def _get_pc():
 
 # ── Embedder model — lazy ─────────────────────────────
 
+# Lightweight (~80MB)
+# Fast on CPU
+# Good semantic understanding
+# Easy to deploy locally
+# No internet needed after first download
+
 def get_embedder():
     """
     Returns SentenceTransformer model, loading it on first call.

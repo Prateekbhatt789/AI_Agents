@@ -38,7 +38,8 @@ export default function SidePanel({ lat,
     setSelectedCategories,
     setGridData,
     setShowGrid,
-    showGrid
+    showGrid,
+    onRadiusChange,
 }) {
     return (
         <div
@@ -55,6 +56,7 @@ export default function SidePanel({ lat,
                 setRadiusKm={setRadiusKm}
                 showGrid={showGrid}
                 setShowGrid={setShowGrid}
+                onRadiusChange={onRadiusChange}
             />
             {isAnalyzed && (
                 <>
@@ -67,7 +69,7 @@ export default function SidePanel({ lat,
                         onDownload={onDownload}
                         onItemClick={() => openContextualPanel?.('panel')}
                         onSelectionChange={setSelectedCategories}
-                        
+
                     />
 
                     {/* {poiData?.pois && (

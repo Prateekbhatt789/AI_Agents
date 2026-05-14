@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import MapViewer from './components/MapViewer'
 import SidePanel from './components/sidePanel'
 import { GlobeIcon, LoaderIcon } from './components/Icons'
@@ -108,14 +108,28 @@ export default function App() {
   // to show grid over map 
   const [gridData, setGridData] = useState([])
   const [roadData, setRoadData] = useState([])
+  const [roadDataKey, setRoadDataKey] = useState('')
   const [showGrid, setShowGrid] = useState(false)
   const [showRoad, setShowRoad] = useState(false)
+  const activeRoadRequestRef = useRef('')
   // for enabling and disabling the button 
   const SHOW_GRID_BUTTON = import.meta.env.VITE_SHOW_GRID_BUTTON === 'true'
 
   function openContextualPanel(mode = 'panel') {
     setContextualMode(mode)
     setShowChat(true)
+  }
+
+  function getRoadDataKey(nextLat = lat, nextLon = lon, nextRadius = radiusKm) {
+    if (nextLat == null || nextLon == null || nextRadius == null) return ''
+    return `${nextLat}:${nextLon}:${nextRadius}`
+  }
+
+  function resetRoadLayer() {
+    activeRoadRequestRef.current = ''
+    setRoadData([])
+    setRoadDataKey('')
+    setShowRoad(false)
   }
 
   useEffect(() => {
@@ -141,6 +155,7 @@ export default function App() {
   async function handleSearch(query, radius) {
     setStatus('Searching...')
     setRadiusKm(radius)
+    resetRoadLayer()
 
     try {
       const data = await searchLocation(query)
@@ -169,6 +184,7 @@ export default function App() {
       setContextualMode('panel')
       setSelectedCategories([])
       setSelectedSubcategories({})
+      setRoadSummary({})
 
       setStatus(`Found: ${data.place_name} Inside boundary`)
       return true
@@ -177,6 +193,63 @@ export default function App() {
       return false
     }
   }
+
+
+
+  // async function handleSearch(query, radius) {
+  //   setStatus('Searching...')
+  //   setRadiusKm(radius)
+
+  //   try {
+  //     const data = await searchLocation(query)
+
+  //     let lat = data?.lat
+  //     let lon = data?.lon
+
+  //     const isInside = isWithinDelhiBoundary(lat, lon)
+
+  //     if (!isInside) {
+  //       setStatus('Location is outside allowed boundary ')
+  //       return false
+  //     }
+
+  //     // Reset previous analysis state
+  //     setLat(lat)
+  //     setLon(lon)
+  //     setLocationName(data.place_name)
+
+  //     setPoiData(null)
+  //     setSummary({})
+  //     setRoadSummary({})
+
+  //     setIsAnalyzed(false)
+  //     setIsAnalyzing(false)
+
+  //     setSuggestions([])
+  //     setSessionId(null)
+  //     setMessages([])
+
+  //     setShowChat(false)
+  //     setContextualMode('panel')
+
+  //     setSelectedCategories([])
+  //     setSelectedSubcategories({})
+
+  //     // IMPORTANT RESETS
+  //     setGridData([])
+  //     setRoadData([])
+
+  //     setShowGrid(false)
+  //     setShowRoad(false)
+
+  //     setStatus(`Found: ${data.place_name} Inside boundary`)
+  //     return true
+
+  //   } catch (err) {
+  //     setStatus('Location not found')
+  //     return false
+  //   }
+  // }
 
   function handleClearSearch() {
     setLat(null)
@@ -193,19 +266,28 @@ export default function App() {
     setSelectedCategories([])
     setSelectedSubcategories({})
     setGridData([])
-    setRoadData([])
     setShowGrid(false)
-    setShowRoad(false)
+    resetRoadLayer()
+    setRadiusKm(1)
     setStatus('Ready')
   }
 
-  async function handleAnalyze() {
+  async function handleAnalyze(radius = radiusKm) {
     if (!lat || !lon) return
+    const analysisRadius = radius
+    setRadiusKm(analysisRadius)
+    resetRoadLayer()
+
+    // ← ADD THESE THREE LINES
+    setSelectedSubcategories({})
+    setSelectedCategories([])
+    setShowChat(false)
+
     setIsAnalyzing(true)
 
     try {
       setStatus('Fetching data ...')
-      const pois = await fetchPOIs(lat, lon, radiusKm)
+      const pois = await fetchPOIs(lat, lon, analysisRadius)
       console.log("Grids data is", pois)
       setPoiData(pois)
       setSummary(pois.summary)
@@ -217,7 +299,7 @@ export default function App() {
 
       setStatus('Storing data and building spatial grid...')
       const analyzeResult = await analyzeLocation(
-        locationName, lat, lon, radiusKm, pois
+        locationName, lat, lon, analysisRadius, pois
       )
 
       if (analyzeResult?.session_id) {
@@ -263,7 +345,7 @@ export default function App() {
         lon,
         radiusKm,
         summary,
-        roadSummary,    // ← new
+        roadSummary,
         suggestions     // ← already exists as state
       )
       const url = URL.createObjectURL(blob)
@@ -286,10 +368,20 @@ export default function App() {
     }
 
     try {
-      if (!roadData.length) {
+      const currentRoadDataKey = getRoadDataKey()
+      const hasRoadData = Array.isArray(roadData)
+        ? roadData.length > 0
+        : Boolean(roadData?.type)
+
+      if (!hasRoadData || roadDataKey !== currentRoadDataKey) {
         setStatus('Fetching road data...')
+        activeRoadRequestRef.current = currentRoadDataKey
         const roads = await fetchRoads(lat, lon, radiusKm)
+
+        if (activeRoadRequestRef.current !== currentRoadDataKey) return
+
         setRoadData(Array.isArray(roads) ? roads : roads?.roads ?? roads?.features ?? roads?.data ?? [])
+        setRoadDataKey(currentRoadDataKey)
       }
 
       setShowRoad(true)
@@ -346,6 +438,8 @@ export default function App() {
       setContextualMode('panel')
       setSelectedCategories([])
       setSelectedSubcategories({})
+      setRoadSummary({})
+      resetRoadLayer()
       setStatus(`Found: ${data.place_name}`)
     } catch (err) {
       setStatus('Could not get location name')
@@ -456,6 +550,7 @@ export default function App() {
           setGridData={setGridData}
           showGrid={showGrid}
           setShowGrid={setShowGrid}
+          onRadiusChange={setRadiusKm}
         />
         {showChat && (
           <div className="relative z-30 h-full w-80 shrink-0">

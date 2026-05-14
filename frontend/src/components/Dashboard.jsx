@@ -12,9 +12,9 @@ import {
     UtensilsIcon
 } from './Icons'
 import { useState, useEffect } from 'react';
-import { fetchDashboardCategories,fetchCategoriesCount } from '../services/api';
+import { fetchDashboardCategories } from '../services/api';
 
-export default function Dashboard({ locationName, summary, lat, lon, radiusKm, onDownload, onItemClick, onSelectionChange }) {
+export default function Dashboard({ locationName, summary, onDownload, onItemClick, onSelectionChange }) {
     const [categories, setCategories] = useState([]);
     const [selectedCategories, setSelectedCategories] = useState([]);
 
@@ -27,17 +27,12 @@ export default function Dashboard({ locationName, summary, lat, lon, radiusKm, o
 
         async function loadCategories() {
             try {
-                const [categoryList, counts] = await Promise.all([
-                    fetchDashboardCategories(),
-                    lat != null && lon != null && radiusKm != null
-                        ? fetchCategoriesCount(lat, lon, radiusKm)
-                        : Promise.resolve({})
-                ]);
+                const categoryList = await fetchDashboardCategories();
 
                 if (!mounted) return;
 
                 const normalizedCounts = Object.fromEntries(
-                    Object.entries(counts).map(([key, value]) => [normalizeKey(key), value])
+                    Object.entries(summary || {}).map(([key, value]) => [normalizeKey(key), value])
                 );
 
                 const enriched = categoryList
@@ -64,7 +59,7 @@ export default function Dashboard({ locationName, summary, lat, lon, radiusKm, o
         return () => {
             mounted = false;
         };
-    }, [lat, lon, radiusKm]);
+    }, [summary]);
 
     const toggleCategory = (key) => {
         const nextSelectedCategories = selectedCategories.includes(key)
@@ -111,7 +106,7 @@ export default function Dashboard({ locationName, summary, lat, lon, radiusKm, o
                                         : "bg-[#f9f8f6] text-slate-700 border-slate-200 hover:bg-blue-50/100"
                                     }`}
                             >
-                                    <div className="flex w-full items-center justify-between gap-3 mr-3">
+                                <div className="flex w-full items-center justify-between gap-3 mr-3">
 
                                     <div className="flex items-center gap-3">
                                         <span

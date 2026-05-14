@@ -191,11 +191,16 @@ const ContextualPanel = ({
 
               {/* Data */}
               {!isLoadingSubcategories && !subcategoryError && selectedCategories.length > 0 &&
-                selectedCategories.map((categoryKey) => {
-                  const items = Array.isArray(subcategoryData?.[categoryKey])
-                    ? subcategoryData[categoryKey]
-                    : []
-                  const selectedItems = selectedSubcategories[categoryKey] || []
+                selectedCategories
+                  .map((categoryKey) => {
+                    const items = Array.isArray(subcategoryData?.[categoryKey])
+                      ? subcategoryData[categoryKey]
+                      : []
+                    return { categoryKey, items }
+                  })
+                  .filter(({ items }) => items.length > 0)
+                  .map(({ categoryKey, items }) => {
+                    const selectedItems = selectedSubcategories[categoryKey] || []
 
                   return (
                     <div
@@ -218,35 +223,29 @@ const ContextualPanel = ({
                         )}
                       </div>
 
-                      {items.length ? (
-                        <div className="mt-3 flex flex-col gap-2">
-                          {items.map((item) => {
-                            const isSelected = selectedItems.includes(item.key)
+                      <div className="mt-3 flex flex-col gap-2">
+                        {items.map((item) => {
+                          const isSelected = selectedItems.includes(item.key)
 
-                            return (
-                              <button
-                                key={`${categoryKey}-${item.key}`}
-                                type="button"
-                                onClick={() => toggleSubcategory(categoryKey, item.key)}
-                                className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm shadow-sm transition-all hover:shadow-md
-                                  ${isSelected
-                                    ? 'border-cyan-500 bg-cyan-600 text-white'
-                                    : 'border-white/70 bg-white/80 text-slate-700 hover:border-cyan-300'
-                                  }`}
-                              >
-                                <span className="min-w-0 truncate">{item.key}</span>
-                                <span className={`ml-3 shrink-0 font-semibold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
-                                  {item.value}
-                                </span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-sm text-slate-600">
-                          No subcategories found.
-                        </p>
-                      )}
+                          return (
+                            <button
+                              key={`${categoryKey}-${item.key}`}
+                              type="button"
+                              onClick={() => toggleSubcategory(categoryKey, item.key)}
+                              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm shadow-sm transition-all hover:shadow-md
+                                ${isSelected
+                                  ? 'border-cyan-500 bg-cyan-600 text-white'
+                                  : 'border-white/70 bg-white/80 text-slate-700 hover:border-cyan-300'
+                                }`}
+                            >
+                              <span className="min-w-0 truncate">{item.key}</span>
+                              <span className={`ml-3 shrink-0 font-semibold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                                {item.value}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
                   )
                 })

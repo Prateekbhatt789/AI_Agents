@@ -301,6 +301,8 @@ function lineCoordinatesToPositions(coordinates) {
         .map(([lng, lat]) => [lat, lng])
 }
 
+
+
 function getRoadCategory(featureOrRoad) {
     return normalizeKey(
         featureOrRoad?.properties?.category ||
@@ -316,17 +318,20 @@ function getRoadPathOptions(featureOrRoad) {
 
     return {
         color,
-        weight: 2.2,
+        weight: 3.2,
         opacity: 0.85,
     }
 }
 
+
+
 function RoadLayer({ roadData = [] }) {
+
     if (roadData?.type === 'FeatureCollection' || roadData?.type === 'Feature') {
         return (
             <GeoJSON
                 data={roadData}
-                style={getRoadPathOptions}
+                style={(feature) => getRoadPathOptions(feature)}
             />
         )
     }
@@ -334,12 +339,23 @@ function RoadLayer({ roadData = [] }) {
     if (!Array.isArray(roadData)) return null
 
     return roadData.map((road, index) => {
+
         const geom = parseGeometry(road.geom || road.geometry || road)
-        const coordinates = geom?.type === 'Feature' ? geom.geometry?.coordinates : geom?.coordinates
-        const type = geom?.type === 'Feature' ? geom.geometry?.type : geom?.type
+
+        const coordinates =
+            geom?.type === 'Feature'
+                ? geom.geometry?.coordinates
+                : geom?.coordinates
+
+        const type =
+            geom?.type === 'Feature'
+                ? geom.geometry?.type
+                : geom?.type
 
         if (type === 'LineString') {
+
             const positions = lineCoordinatesToPositions(coordinates)
+
             if (!positions.length) return null
 
             return (
@@ -352,9 +368,11 @@ function RoadLayer({ roadData = [] }) {
         }
 
         if (type === 'MultiLineString') {
+
             const positions = coordinates
                 .map(lineCoordinatesToPositions)
                 .filter((line) => line.length > 0)
+
             if (!positions.length) return null
 
             return (
@@ -369,6 +387,107 @@ function RoadLayer({ roadData = [] }) {
         return null
     })
 }
+
+// function RoadLayer({ roadData = [] }) {
+
+//     // FOR GEOJSON RESPONSE
+//     if (roadData?.type === 'FeatureCollection' || roadData?.type === 'Feature') {
+//         return (
+//             <GeoJSON
+//                 data={roadData}
+//                 style={(feature) => {
+
+//                     const category = getRoadCategory(feature)
+
+//                     console.log("GEOJSON CATEGORY:", category)
+
+//                     // SHOW ONLY PRIMARY ROAD
+//                     if (category !== 'primary') {
+//                         return {
+//                             opacity: 0,
+//                             fillOpacity: 0,
+//                         }
+//                     }
+
+//                     return {
+//                         color: '#ef4444',
+//                         weight: 5.2,
+//                         opacity: 1,
+//                     }
+//                 }}
+//             />
+//         )
+//     }
+
+//     if (!Array.isArray(roadData)) return null
+
+//     return roadData.map((road, index) => {
+
+//         const category = getRoadCategory(road)
+
+//         console.log("ROAD CATEGORY:", category)
+
+//         // SHOW ONLY PRIMARY ROAD
+//         if (category !== 'primary') {
+//             return null
+//         }
+
+//         const geom = parseGeometry(road.geom || road.geometry || road)
+
+//         const coordinates =
+//             geom?.type === 'Feature'
+//                 ? geom.geometry?.coordinates
+//                 : geom?.coordinates
+
+//         const type =
+//             geom?.type === 'Feature'
+//                 ? geom.geometry?.type
+//                 : geom?.type
+
+//         if (type === 'LineString') {
+
+//             const positions = lineCoordinatesToPositions(coordinates)
+
+//             if (!positions.length) return null
+
+//             return (
+//                 <Polyline
+//                     key={road.id || road.road_id || `road-${index}`}
+//                     positions={positions}
+//                     pathOptions={{
+//                         color: '#ef4444',
+//                         weight: 5.2,
+//                         opacity: 1,
+//                     }}
+//                 />
+//             )
+//         }
+
+//         if (type === 'MultiLineString') {
+
+//             const positions = coordinates
+//                 .map(lineCoordinatesToPositions)
+//                 .filter((line) => line.length > 0)
+
+//             if (!positions.length) return null
+
+//             return (
+//                 <Polyline
+//                     key={road.id || road.road_id || `road-${index}`}
+//                     positions={positions}
+//                     pathOptions={{
+//                         color: '#ef4444',
+//                         weight: 5.2,
+//                         opacity: 1,
+//                     }}
+//                 />
+//             )
+//         }
+
+//         return null
+//     })
+// }
+
 
 function ResizeMap({ trigger }) {
     const map = useMap();
@@ -593,198 +712,198 @@ export default function MapViewer({
                 <ConstrainToDelhiExtent />
 
                 {delhiBoundaryLatLngs.length > 0 && (
-                <>
-                    <Polygon
-                        positions={[WORLD_MASK_RING, delhiBoundaryLatLngs]}
-                        pathOptions={{
-                            stroke: false,
-                            fillColor: '#0f172a',
-                            fillOpacity: 0.28,
-                            interactive: false,
-                        }}
-                    />
-                    <Polygon
-                        positions={delhiBoundaryLatLngs}
-                        pathOptions={{
-                            color: '#fff7ed',
-                            weight: 1.5,
-                            opacity: 0.95,
-                            fillColor: '#22c55e',
-                            fillOpacity: 0.06,
-                            interactive: false,
-                        }}
-                    />
-                    <Polyline
-                        positions={delhiBoundaryLatLngs}
-                        pathOptions={{
-                            color: '#f97316',
-                            weight: 4,
-                            opacity: 0.95,
-                            lineCap: 'round',
-                            lineJoin: 'round',
-                            dashArray: '10 8',
-                        }}
-                        interactive={false}
-                    />
-                </>
-            )}
-
-            {onMapClick && (
-                <MapClickHandler
-                    onMapClick={onMapClick}
-                    isAnalyzing={isAnalyzing}
-                    isAnalyzed={isAnalyzed}
-                    centerLat={lat}
-                    centerLon={lon}
-                    radiusKm={radiusKm}
-                />
-            )}
-
-            {lat && lon && <FlyToLocation lat={lat} lon={lon} />}
-            <ResizeMap trigger={trigger} />
-            {showLegend && (
-                <LegendControl
-                    legendItems={legendItems}
-                    selectedCategories={selectedCategories}
-                    onToggleCategory={handleToggleCategory}
-                    onReset={resetLegendSelection}
-                />
-            )}
-            {suggestions && suggestions.length > 0 && (
-                <FlyToSuggestion suggestions={suggestions} />
-            )}
-
-            {lat && lon && (
-                <Marker position={[lat, lon]}>
-                    <Popup>
-                        <strong>Selected Location</strong><br />
-                        {lat.toFixed(4)}, {lon.toFixed(4)}
-                    </Popup>
-                </Marker>
-            )}
-
-            {lat && lon && radiusKm && (
-                <Circle
-                    center={[lat, lon]}
-                    radius={radiusKm * 1000}
-                    pathOptions={{
-                        color: '#0891b2',
-                        weight: isAnalyzed ? 2 : 1,
-                        fillColor: '#22d3ee',
-                        fillOpacity: isAnalyzed ? 0.1 : 0.06
-                    }}
-                />
-            )}
-
-            {showGrid && gridData.map((cell) => {
-                try {
-                    const geom = typeof cell.geom === 'string' ? JSON.parse(cell.geom) : cell.geom
-                    const positions = geom.coordinates[0].map(([lng, lat]) => [lat, lng])
-                    const opacity = Math.min(cell.score / 100, 1)
-                    { console.log('showGrid:', showGrid, 'gridData length:', gridData?.length, 'sample:', gridData?.[0]) }
-
-                    return (
+                    <>
                         <Polygon
-                            key={cell.grid_id}
-                            positions={positions}
+                            positions={[WORLD_MASK_RING, delhiBoundaryLatLngs]}
                             pathOptions={{
-                                color: '#0891b2',
-                                weight: 0.8,
-                                fillColor: `hsl(${Math.round(opacity * 120)}, 80%, 45%)`,
-                                fillOpacity: 0.35,
+                                stroke: false,
+                                fillColor: '#0f172a',
+                                fillOpacity: 0.28,
+                                interactive: false,
                             }}
-                        >
-                            <Popup>
-                                <strong>Grid {cell.grid_id}</strong><br />
-                                Score: {cell.normalized_score}<br />
-                                Population: {cell.population}
-                            </Popup>
-                        </Polygon>
-                    )
-                } catch {
-                    return null
-                }
-            })}
+                        />
+                        <Polygon
+                            positions={delhiBoundaryLatLngs}
+                            pathOptions={{
+                                color: '#fff7ed',
+                                weight: 1.5,
+                                opacity: 0.95,
+                                fillColor: '#22c55e',
+                                fillOpacity: 0.06,
+                                interactive: false,
+                            }}
+                        />
+                        <Polyline
+                            positions={delhiBoundaryLatLngs}
+                            pathOptions={{
+                                color: '#f97316',
+                                weight: 4,
+                                opacity: 0.95,
+                                lineCap: 'round',
+                                lineJoin: 'round',
+                                dashArray: '10 8',
+                            }}
+                            interactive={false}
+                        />
+                    </>
+                )}
 
-            {showRoad && <RoadLayer roadData={roadData} />}
+                {onMapClick && (
+                    <MapClickHandler
+                        onMapClick={onMapClick}
+                        isAnalyzing={isAnalyzing}
+                        isAnalyzed={isAnalyzed}
+                        centerLat={lat}
+                        centerLon={lon}
+                        radiusKm={radiusKm}
+                    />
+                )}
 
-            {poiData?.pois && Object.entries(poiData.pois).map(([category, items]) => {
-                if (!Array.isArray(items)) return null
+                {lat && lon && <FlyToLocation lat={lat} lon={lon} />}
+                <ResizeMap trigger={trigger} />
+                {showLegend && (
+                    <LegendControl
+                        legendItems={legendItems}
+                        selectedCategories={selectedCategories}
+                        onToggleCategory={handleToggleCategory}
+                        onReset={resetLegendSelection}
+                    />
+                )}
+                {suggestions && suggestions.length > 0 && (
+                    <FlyToSuggestion suggestions={suggestions} />
+                )}
 
-                const normalizedCategory = normalizeKey(category)
-                const isVisible = selectedCategories.includes(normalizedCategory)
-                if (!isVisible) return null
-                const activeSubcategories = selectedSubcategories[normalizedCategory] || []
-                if (hasActiveSubcategorySelection && activeSubcategories.length === 0) return null
-
-                const iconHtml = categoryIcons[normalizedCategory]
-                const icon = createCategoryIcon(category, iconHtml)
-                const style = CATEGORY_STYLES[normalizedCategory] || CATEGORY_STYLES[category] || { symbol: 'POI' }
-                const visibleItems = activeSubcategories.length > 0
-                    ? items.filter((item) => activeSubcategories.includes(item.sub_category || 'Unknown'))
-                    : items
-
-                return visibleItems.slice(0, 100).map((item, i) => {
-                    if (!item.lat || !item.lon) return null
-
-                    return (
-                        <Marker
-                            key={`${category}-${i}`}
-                            position={[item.lat, item.lon]}
-                            icon={icon}
-                        >
-                            <Popup>
-                                <strong>{style.symbol} {item.name || "Unknown"}</strong><br />
-                                <small style={{ color: '#64748b' }}>
-                                    {normalizedCategory.replace(/_/g, ' ').toUpperCase()}
-                                </small>
-                                {item.sub_category && (
-                                    <>
-                                        <br />
-                                        <small style={{ color: '#0f766e', fontWeight: 600 }}>
-                                            Sub-category: {item.sub_category}
-                                        </small>
-                                    </>
-                                )}
-                            </Popup>
-                        </Marker>
-                    )
-                })
-            })}
-
-            {suggestions && suggestions.map(s => (
-                s?.lat && s?.lon ? (
-                    <Marker
-                        key={`suggestion-${s.rank}`}
-                        position={[s.lat, s.lon]}
-                        icon={createRankedIcon(s.rank)}
-                    >
+                {lat && lon && (
+                    <Marker position={[lat, lon]}>
                         <Popup>
-                            <strong>
-                                {RANK_TITLES[s.rank] || `Option ${s.rank}`}
-                            </strong><br />
-                            <small style={{ color: '#475569' }}>
-                                {s.label}
-                            </small><br /><br />
-                            {s.notes?.map((note, i) => (
-                                <span key={i} style={{ fontSize: '12px' }}>
-                                    {note}<br />
-                                </span>
-                            ))}
-                            <br />
-                            <small style={{ color: '#94a3b8' }}>
-                                {s.lat?.toFixed(4)}, {s.lon?.toFixed(4)}
-                            </small>
+                            <strong>Selected Location</strong><br />
+                            {lat.toFixed(4)}, {lon.toFixed(4)}
                         </Popup>
                     </Marker>
-                ) : null
-            ))}
+                )}
 
-            <div className='absolute bottom-2 right-2 z-[1000] flex items-center gap-1 bg-black/80 backdrop-blur-sm rounded-full text-white px-4 py-1.5 text-xs shadow-lg border border-white/10'>
-                <span className="opacity-80">Powered By</span>
-                <span className="font-bold tracking-wide">ML Infomap</span>
-            </div>
-        </MapContainer>
+                {lat && lon && radiusKm && (
+                    <Circle
+                        center={[lat, lon]}
+                        radius={radiusKm * 1000}
+                        pathOptions={{
+                            color: '#0891b2',
+                            weight: isAnalyzed ? 2 : 1,
+                            fillColor: '#22d3ee',
+                            fillOpacity: isAnalyzed ? 0.1 : 0.06
+                        }}
+                    />
+                )}
+
+                {showGrid && gridData.map((cell) => {
+                    try {
+                        const geom = typeof cell.geom === 'string' ? JSON.parse(cell.geom) : cell.geom
+                        const positions = geom.coordinates[0].map(([lng, lat]) => [lat, lng])
+                        const opacity = Math.min(cell.score / 100, 1)
+                        { console.log('showGrid:', showGrid, 'gridData length:', gridData?.length, 'sample:', gridData?.[0]) }
+
+                        return (
+                            <Polygon
+                                key={cell.grid_id}
+                                positions={positions}
+                                pathOptions={{
+                                    color: '#0891b2',
+                                    weight: 0.8,
+                                    fillColor: `hsl(${Math.round(opacity * 120)}, 80%, 45%)`,
+                                    fillOpacity: 0.35,
+                                }}
+                            >
+                                <Popup>
+                                    <strong>Grid {cell.grid_id}</strong><br />
+                                    Score: {cell.normalized_score}<br />
+                                    Population: {cell.population}
+                                </Popup>
+                            </Polygon>
+                        )
+                    } catch {
+                        return null
+                    }
+                })}
+
+                {showRoad && <RoadLayer roadData={roadData} />}
+
+                {poiData?.pois && Object.entries(poiData.pois).map(([category, items]) => {
+                    if (!Array.isArray(items)) return null
+
+                    const normalizedCategory = normalizeKey(category)
+                    const isVisible = selectedCategories.includes(normalizedCategory)
+                    if (!isVisible) return null
+                    const activeSubcategories = selectedSubcategories[normalizedCategory] || []
+                    if (hasActiveSubcategorySelection && activeSubcategories.length === 0) return null
+
+                    const iconHtml = categoryIcons[normalizedCategory]
+                    const icon = createCategoryIcon(category, iconHtml)
+                    const style = CATEGORY_STYLES[normalizedCategory] || CATEGORY_STYLES[category] || { symbol: 'POI' }
+                    const visibleItems = activeSubcategories.length > 0
+                        ? items.filter((item) => activeSubcategories.includes(item.sub_category || 'Unknown'))
+                        : items
+
+                    return visibleItems.slice(0, 100).map((item, i) => {
+                        if (!item.lat || !item.lon) return null
+
+                        return (
+                            <Marker
+                                key={`${category}-${i}`}
+                                position={[item.lat, item.lon]}
+                                icon={icon}
+                            >
+                                <Popup>
+                                    <strong>{style.symbol} {item.name || "Unknown"}</strong><br />
+                                    <small style={{ color: '#64748b' }}>
+                                        {normalizedCategory.replace(/_/g, ' ').toUpperCase()}
+                                    </small>
+                                    {item.sub_category && (
+                                        <>
+                                            <br />
+                                            <small style={{ color: '#0f766e', fontWeight: 600 }}>
+                                                Sub-category: {item.sub_category}
+                                            </small>
+                                        </>
+                                    )}
+                                </Popup>
+                            </Marker>
+                        )
+                    })
+                })}
+
+                {suggestions && suggestions.map(s => (
+                    s?.lat && s?.lon ? (
+                        <Marker
+                            key={`suggestion-${s.rank}`}
+                            position={[s.lat, s.lon]}
+                            icon={createRankedIcon(s.rank)}
+                        >
+                            <Popup>
+                                <strong>
+                                    {RANK_TITLES[s.rank] || `Option ${s.rank}`}
+                                </strong><br />
+                                <small style={{ color: '#475569' }}>
+                                    {s.label}
+                                </small><br /><br />
+                                {s.notes?.map((note, i) => (
+                                    <span key={i} style={{ fontSize: '12px' }}>
+                                        {note}<br />
+                                    </span>
+                                ))}
+                                <br />
+                                <small style={{ color: '#94a3b8' }}>
+                                    {s.lat?.toFixed(4)}, {s.lon?.toFixed(4)}
+                                </small>
+                            </Popup>
+                        </Marker>
+                    ) : null
+                ))}
+
+                <div className='absolute bottom-2 right-2 z-[1000] flex items-center gap-1 bg-black/80 backdrop-blur-sm rounded-full text-white px-4 py-1.5 text-xs shadow-lg border border-white/10'>
+                    <span className="opacity-80">Powered By</span>
+                    <span className="font-bold tracking-wide">ML Infomap</span>
+                </div>
+            </MapContainer>
         </div>
     )
 }
