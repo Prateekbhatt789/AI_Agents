@@ -69,7 +69,7 @@ export async function analyzeLocation(location, lat, lon, radius_km, poi_data) {
         location, lat, lon, radius_km, poi_data
     })
 
-    // ✅ Save session_id internally as fallback
+    //  Save session_id internally as fallback
     if (data.session_id) {
         _sessionId = data.session_id
         console.log('🔍 Session ID saved:', _sessionId)

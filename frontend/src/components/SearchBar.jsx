@@ -7,6 +7,7 @@ export default function SearchBar({
     onClearSearch,
     onAnalyze,
     onOpenContextualPanel,
+    onShowCityWiseAnalyse,
     locationFound,
     isAnalyzing,
     locationName,
@@ -88,6 +89,13 @@ export default function SearchBar({
                             Search Location
                         </h3>
                     </div>
+                    <button
+                        type="button"
+                        onClick={onShowCityWiseAnalyse}
+                        className='rounded-md bg-cyan-600 text-white px-3 py-1 text-sm font-semibold hover:bg-cyan-700'
+                    >
+                        click
+                    </button>
                 </div>
                 <p className="text-xs text-slate-500 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                     Pick a place, radius, and start the analysis.

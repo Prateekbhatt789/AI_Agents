@@ -1,6 +1,7 @@
 import { useState } from "react";
 import SearchBar from './SearchBar'
 import Dashboard from "./Dashboard";
+import CityWiseAnalyse from "./CityWiseAnalyse";
 import { DownloadIcon } from './Icons'
 import './sidePanel.css'
 
@@ -40,37 +41,44 @@ export default function SidePanel({ lat,
     setShowGrid,
     showGrid
 }) {
+    const [showCityWiseAnalyse, setShowCityWiseAnalyse] = useState(false)
+
     return (
         <div
             className="side-panel-scrollbar flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-r border-white/40 bg-[#0f766e] p-2 backdrop-blur-md"
         >
-            <SearchBar
-                onSearch={onSearch}
-                onClearSearch={onClearSearch}
-                onAnalyze={onAnalyze}
-                onOpenContextualPanel={openContextualPanel}
-                locationFound={!!lat}
-                isAnalyzing={isAnalyzing}
-                locationName={locationName}
-                setRadiusKm={setRadiusKm}
-                showGrid={showGrid}
-                setShowGrid={setShowGrid}
-            />
-            {isAnalyzed && (
+            {showCityWiseAnalyse ? (
+                <CityWiseAnalyse />
+            ) : (
                 <>
-                    <Dashboard
+                    <SearchBar
+                        onSearch={onSearch}
+                        onClearSearch={onClearSearch}
+                        onAnalyze={onAnalyze}
+                        onOpenContextualPanel={openContextualPanel}
+                        onShowCityWiseAnalyse={() => setShowCityWiseAnalyse(true)}
+                        locationFound={!!lat}
+                        isAnalyzing={isAnalyzing}
                         locationName={locationName}
-                        summary={summary}
-                        lat={lat}
-                        lon={lon}
-                        radiusKm={radiusKm}
-                        onDownload={onDownload}
-                        onItemClick={() => openContextualPanel?.('panel')}
-                        onSelectionChange={setSelectedCategories}
-                        
+                        setRadiusKm={setRadiusKm}
+                        showGrid={showGrid}
+                        setShowGrid={setShowGrid}
                     />
+                    {isAnalyzed && (
+                        <>
+                            <Dashboard
+                                locationName={locationName}
+                                summary={summary}
+                                lat={lat}
+                                lon={lon}
+                                radiusKm={radiusKm}
+                                onDownload={onDownload}
+                                onItemClick={() => openContextualPanel?.('panel')}
+                                onSelectionChange={setSelectedCategories}
 
-                    {/* {poiData?.pois && (
+                            />
+
+                            {/* {poiData?.pois && (
                         <div className="rounded-xl border border-white/55 bg-white/72 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl">
                             <div className="mb-3 flex items-center justify-between gap-2">
                                 <div>
@@ -112,18 +120,20 @@ export default function SidePanel({ lat,
                         </div>
                     )} */}
 
-                    <div className="flex w-full items-center justify-center gap-1 rounded-2xl  bg-white/72  py-2 text-sm font-semibold text-slate-900 transition hover:bg-[#14b8a6] hover:text-white hover:border hover:border-white">
-                        <button
-                            onClick={onDownload}
-                            className="flex gap-2 items-center justify-center">
-                            <span className="flex items-center justify-center h-5 w-5 rounded-full bg-black text-white">
-                                <DownloadIcon className="h-4 w-4" />
-                            </span>
-                            <div className="text-xl">
-                                Download Report
+                            <div className="flex w-full items-center justify-center gap-1 rounded-2xl  bg-white/72  py-2 text-sm font-semibold text-slate-900 transition hover:bg-[#14b8a6] hover:text-white hover:border hover:border-white">
+                                <button
+                                    onClick={onDownload}
+                                    className="flex gap-2 items-center justify-center">
+                                    <span className="flex items-center justify-center h-5 w-5 rounded-full bg-black text-white">
+                                        <DownloadIcon className="h-4 w-4" />
+                                    </span>
+                                    <div className="text-xl">
+                                        Download Report
+                                    </div>
+                                </button>
                             </div>
-                        </button>
-                    </div>
+                        </>
+                    )}
                 </>
             )}
         </div>
