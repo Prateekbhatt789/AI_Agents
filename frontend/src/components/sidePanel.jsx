@@ -43,12 +43,17 @@ export default function SidePanel({ lat,
 }) {
     const [showCityWiseAnalyse, setShowCityWiseAnalyse] = useState(false)
 
+    function handleShowCityWiseAnalyse() {
+        onClearSearch?.()
+        setShowCityWiseAnalyse(true)
+    }
+
     return (
         <div
             className="side-panel-scrollbar flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-r border-white/40 bg-[#0f766e] p-2 backdrop-blur-md"
         >
             {showCityWiseAnalyse ? (
-                <CityWiseAnalyse />
+                <CityWiseAnalyse onBack={() => setShowCityWiseAnalyse(false)} />
             ) : (
                 <>
                     <SearchBar
@@ -56,7 +61,7 @@ export default function SidePanel({ lat,
                         onClearSearch={onClearSearch}
                         onAnalyze={onAnalyze}
                         onOpenContextualPanel={openContextualPanel}
-                        onShowCityWiseAnalyse={() => setShowCityWiseAnalyse(true)}
+                        onShowCityWiseAnalyse={handleShowCityWiseAnalyse}
                         locationFound={!!lat}
                         isAnalyzing={isAnalyzing}
                         locationName={locationName}
