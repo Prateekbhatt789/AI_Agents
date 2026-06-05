@@ -1,4 +1,4 @@
-const BASE = 'http://192.168.1.13:8000/api'
+const BASE = 'http://192.168.1.16:8000/api'
 
 // ── Session ID — stored after /analyze, sent on every /chat ──
 // Also accepts sessionId passed explicitly from App.jsx
@@ -194,6 +194,58 @@ export async function fetchContextualSubCategories(tableNames) {
         return data; // your API already returns structured object
     } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
+        throw error;
+    }
+}
+
+export async function fetchCityWiseDropdownItems(city) {
+    try {
+        const response = await fetch(`${BASE}/app2/city`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ city }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (Array.isArray(data)) return data;
+
+        const possibleItems =
+            data.data ||
+            data.items ||
+            data.zones ||
+            data.result ||
+            data.results ||
+            data.city ||
+            data.response;
+
+        if (Array.isArray(possibleItems)) return possibleItems;
+
+        if (possibleItems && typeof possibleItems === "object") {
+            const nestedItems =
+                possibleItems.data ||
+                possibleItems.items ||
+                possibleItems.zones ||
+                possibleItems.result ||
+                possibleItems.results;
+
+            if (Array.isArray(nestedItems)) return nestedItems;
+            return Object.values(possibleItems);
+        }
+
+        if (data && typeof data === "object") {
+            return Object.values(data);
+        }
+
+        return [];
+    } catch (error) {
+        console.error("Failed to fetch city wise dropdown items:", error);
         throw error;
     }
 }
