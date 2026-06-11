@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ChevronDownIcon } from './Icons'
+import { ChevronDownIcon, SearchIcon, SparklesIcon } from './Icons'
 import { fetchCityWiseDropdownItems } from '../services/api'
-import {  SearchIcon, SparklesIcon } from './Icons'
+import targetIcon from '../assets/target.png'
+
 const CityWiseAnalyse = ({ onBack }) => {
   const dropdownItems = [
     'Select city',
@@ -59,12 +60,21 @@ const CityWiseAnalyse = ({ onBack }) => {
         <h3 className="text-lg font-bold uppercase text-slate-900">
           City Wise Analyse
         </h3>
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-md bg-cyan-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-cyan-700">
-          Click
-        </button>
+        <div className="group relative inline-block">
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-full bg-cyan-300 p-1 text-sm font-semibold text-white transition hover:bg-cyan-700">
+            <img src={targetIcon} alt="Back" className="h-6 w-6" />
+          </button>
+          <span
+            className="pointer-events-none absolute top-4 right-2 mt-3 rounded
+                      bg-gray-800 px-2 py-1 text-xs text-white whitespace-nowrap
+                      scale-95 opacity-0 transition-all duration-150
+                      group-hover:scale-100 group-hover:opacity-100">
+            Explore by location
+          </span>
+        </div>
       </div>
 
       <div className="mt-4">
@@ -124,19 +134,19 @@ const CityWiseAnalyse = ({ onBack }) => {
           </select>
           <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-cyan-700" />
         </div>
-        <div className= "mt-3">
-        <button
+        <div className="mt-3">
+          <button
             onClick={() => {
-                onAnalyze()
+              onAnalyze()
             }}
-            
+
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/40 transition-all duration-200 hover:shadow-xl hover:shadow-blue-600/50  disabled:cursor-not-allowed disabled:from-[#87aacf] disabled:to-[#3d88d8] disabled:shadow-none disabled:opacity-60"
-        >  <SparklesIcon className="h-5 w-5" />
-        <span>
-          Analyze Selected Zones
-          </span>
-        </button>
-          
+          >  <SparklesIcon className="h-5 w-5" />
+            <span>
+              Analyze Selected Zones
+            </span>
+          </button>
+
         </div>
         {itemsError && (
           <p className="mt-2 text-xs font-semibold text-rose-600">

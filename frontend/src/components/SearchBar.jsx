@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { CrossIcon, SearchIcon, SparklesIcon, TargetIcon } from './Icons'
 import boundary from '../assets/Delhi_bnd.geojson?raw'
+import carIcon from '../assets/car.svg'
 
 export default function SearchBar({
     onSearch,
@@ -89,13 +90,21 @@ export default function SearchBar({
                             Search Location
                         </h3>
                     </div>
-                    <button
-                        type="button"
-                        onClick={onShowCityWiseAnalyse}
-                        className='rounded-md bg-cyan-600 text-white px-3 py-1 text-sm font-semibold hover:bg-cyan-700'
-                    >
-                        click
-                    </button>
+                    <div className="group relative inline-block">
+                        <button
+                            type="button"
+                            onClick={onShowCityWiseAnalyse}
+                            className="rounded-full bg-cyan-300 p-1 text-sm font-semibold text-white transition hover:bg-cyan-700">
+                            <img src={carIcon} alt="Back" className="h-6 w-6" />
+                        </button>
+                        <span
+                            className="pointer-events-none absolute top-4 right-2 mt-3 rounded
+                                          bg-gray-800 px-2 py-1 text-xs text-white whitespace-nowrap
+                                          scale-95 opacity-0 transition-all duration-150
+                                          group-hover:scale-100 group-hover:opacity-100">
+                            Car Showroom
+                        </span>
+                    </div>
                 </div>
                 <p className="text-xs text-slate-500 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                     Pick a place, radius, and start the analysis.

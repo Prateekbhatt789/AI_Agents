@@ -414,7 +414,7 @@ export default function App() {
       </nav>
 
       {/* Main content area - properly constrained */}
-      <div className="relative flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-visible">
 
         <button
           onClick={() => setShowChat((prev) => !prev)}
